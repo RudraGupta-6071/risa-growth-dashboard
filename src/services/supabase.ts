@@ -9,9 +9,12 @@ const STORAGE_KEY_DAILY = 'risa_daily_v1';
 const STORAGE_KEY_TASKS = 'risa_tasks_v1';
 const STORAGE_KEY_CHAT = 'risa_chat_logs_v1';
 
+const DEFAULT_SUPABASE_URL = 'https://kuqntcxcvallojirzndx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_hE8jDhcfD-MKLbwSG1akQQ_0cUZvyha';
+
 export const getStoredConfig = () => {
-  const url = localStorage.getItem('VITE_SUPABASE_URL') || import.meta.env.VITE_SUPABASE_URL || '';
-  const anonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const url = localStorage.getItem('VITE_SUPABASE_URL') || import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const anonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
   const geminiKey = localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY || '';
   return { url, anonKey, geminiKey };
 };

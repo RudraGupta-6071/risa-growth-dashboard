@@ -93,17 +93,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onOpenResetModal}
                 className="w-full py-2.5 px-4 rounded-2xl text-[#F87171] hover:bg-[#281512] border border-[#F87171]/40 font-bold text-xs tracking-wider text-center uppercase transition-all flex items-center justify-center gap-2"
+                title="Reset all campaign spend and attendee numbers to original 2025 actuals"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>RESET 2025 DATA</span>
-              </button>
-
-              <button
-                onClick={onOpenSettings}
-                className="w-full py-2.5 px-4 rounded-2xl text-[#C4ABA1] hover:text-[#FFFFFF] hover:bg-[#241310] border border-[#381B16] font-bold text-xs tracking-wider text-center uppercase transition-colors flex items-center justify-center gap-2"
-              >
-                <Settings className="w-3.5 h-3.5 text-[#F6C445]" />
-                <span>SETTINGS & KEYS</span>
               </button>
             </div>
           </nav>
@@ -112,20 +105,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Connection Status Strip */}
         <div className="p-3 bg-[#1C0E0C] border border-[#381B16] rounded-2xl flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <div
-              className={`w-2.5 h-2.5 rounded-full ${
-                isSupabaseConfigured ? 'bg-[#34D399] animate-pulse' : 'bg-[#F6C445]'
-              }`}
-            />
-            <span className="text-[11px] font-bold text-[#C4ABA1]">
-              {isSupabaseConfigured ? 'SUPABASE LIVE' : 'LOCAL MODE'}
+            <div className="w-2.5 h-2.5 rounded-full bg-[#34D399] animate-pulse" />
+            <span className="text-[11px] font-bold text-[#FFFFFF]">
+              GROWTH ENGINE LIVE
             </span>
           </div>
           <button
             onClick={onOpenSettings}
-            className="text-[11px] text-[#F6C445] hover:underline font-black px-2 py-0.5 rounded-full bg-[#F6C445]/15"
+            className="text-[10px] text-[#C4ABA1] hover:text-[#F6C445] font-semibold px-2 py-0.5 rounded-full bg-[#281613] border border-[#381B16] transition-colors"
+            title="Database & Engine Status"
           >
-            EDIT
+            INFO
           </button>
         </div>
       </aside>
