@@ -356,20 +356,49 @@ My role is to analyze real-time campaign performance, model CAC economics, ident
 You can ask me to diagnose any channel (e.g. *"Diagnose Creator Partners"*), compare channels (*"Compare Paid Social and Referrals"*), explain bottlenecks (*"Where are we losing attendees?"*), or create tasks (*"Create a task to cut Creator Partners"*).`;
 };
 
-// Send message to Gemini / Fallback
+// Send message to Supabase Edge Function (secure, hides Gemini key) -> Direct Gemini -> Fallback
 export const sendChatMessage = async (
   messages: ChatMessage[],
   campaigns: Campaign[],
   targets: Target[],
   sessionId: string
 ): Promise<string> => {
-  const { geminiKey } = getStoredConfig();
+  const { url, anonKey, geminiKey } = getStoredConfig();
 
-  // 1. Try direct Google Gemini API if Gemini API Key is provided
+  // 1. Try Supabase Edge Function first (keeps GEMINI_API_KEY 100% hidden on server)
+  if (url && anonKey) {
+    try {
+      const edgeUrl = `${url.replace(/\/$/, '')}/functions/v1/chat-handler`;
+      const res = await fetch(edgeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+          ...(geminiKey ? { 'x-gemini-key': geminiKey } : {})
+        },
+        body: JSON.stringify({
+          messages,
+          session_id: sessionId,
+          campaigns,
+          targets
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reply) return data.reply;
+      }
+    } catch (e) {
+      console.warn('Edge function not reachable, trying direct Gemini API...', e);
+    }
+  }
+
+  // 2. Try direct Google Gemini 2.5 Flash API if Gemini API Key is provided locally
   if (geminiKey) {
     try {
       const systemInstruction = buildSystemPrompt(campaigns, targets);
-      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
       const contents = messages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
@@ -383,7 +412,10 @@ export const sendChatMessage = async (
         contents: contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 800,
+          maxOutputTokens: 1500,
+          thinkingConfig: {
+            thinkingBudget: 1024
+          }
         }
       };
 
@@ -395,7 +427,8 @@ export const sendChatMessage = async (
 
       if (res.ok) {
         const data = await res.json();
-        const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('');
         if (replyText) return replyText;
       }
     } catch (e) {

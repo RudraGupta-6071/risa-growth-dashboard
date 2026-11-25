@@ -87,8 +87,8 @@ RULES
 7. Be concise. No more than 5 sentences unless doing a full diagnosis.
 8. If data was recently edited (the user may mention this), acknowledge that the numbers shown are the current live values.`;
 
-    // 3. Call Google Gemini 1.5 Flash API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+    // 3. Call Google Gemini 2.5 Flash API with Thinking enabled
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
     const contents = (messages || []).map((m: any) => ({
       role: m.role === 'user' ? 'user' : 'model',
@@ -103,13 +103,17 @@ RULES
         contents: contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 800
+          maxOutputTokens: 1500,
+          thinkingConfig: {
+            thinkingBudget: 1024
+          }
         }
       })
     });
 
     const geminiData = await geminiRes.json();
-    const replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+    const parts = geminiData.candidates?.[0]?.content?.parts || [];
+    const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('') || 'No response generated';
 
     // 4. Save to chat_logs
     if (session_id) {
