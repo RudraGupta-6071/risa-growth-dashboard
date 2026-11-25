@@ -10,7 +10,7 @@ import { TasksTab } from './tabs/TasksTab';
 import { ChatbotTab } from './tabs/ChatbotTab';
 import { Campaign, Target, DailyMetric, Task } from './types';
 import { api } from './services/supabase';
-import { Search, ChevronRight, Menu } from 'lucide-react';
+import { Search, ChevronRight, Menu, Download, Presentation } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -158,6 +158,17 @@ export const App: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Download PPTX Button */}
+            <a
+              href={`${import.meta.env.BASE_URL}RISA_Growth_APM_Presentation.pptx`}
+              download="RISA_Growth_APM_Presentation.pptx"
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-[#F6C445] hover:bg-[#FFD15C] text-[#140A09] text-xs font-black rounded-full shadow-lg transition-transform hover:scale-105 uppercase tracking-wider shrink-0 cursor-pointer"
+              title="Download 8-Slide Visual Presentation (.pptx)"
+            >
+              <Presentation className="w-3.5 h-3.5" />
+              <span>Download Presentation (.pptx)</span>
+            </a>
 
             {/* Mobile Menu Button */}
             <button
