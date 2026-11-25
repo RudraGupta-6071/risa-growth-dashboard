@@ -29,10 +29,17 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch live campaigns and targets
-    const [{ data: campaigns }, { data: targets }] = await Promise.all([
+    // 1. Fetch live campaigns, targets, tasks, and daily metrics
+    const [
+      { data: campaigns },
+      { data: targets },
+      { data: tasks },
+      { data: dailyMetrics }
+    ] = await Promise.all([
       supabase.from('campaigns').select('*').order('id', { ascending: true }),
-      supabase.from('targets').select('*').order('id', { ascending: true })
+      supabase.from('targets').select('*').order('id', { ascending: true }),
+      supabase.from('tasks').select('*').order('id', { ascending: true }),
+      supabase.from('daily_metrics').select('*').order('metric_date', { ascending: true })
     ]);
 
     // 2. Build system prompt with live injected data
@@ -48,6 +55,12 @@ ${JSON.stringify(campaigns || [], null, 2)}
 
 TARGETS:
 ${JSON.stringify(targets || [], null, 2)}
+
+TASKS:
+${JSON.stringify(tasks || [], null, 2)}
+
+DAILY METRICS (pre-event funnel trend):
+${JSON.stringify(dailyMetrics || [], null, 2)}
 
 ═══════════════════════════════════════
 WHAT YOU KNOW (sourced from the data)
@@ -87,37 +100,58 @@ RULES
 7. Be concise. No more than 5 sentences unless doing a full diagnosis.
 8. If data was recently edited (the user may mention this), acknowledge that the numbers shown are the current live values.`;
 
-    // 3. Call Google Gemini 2.5 Flash API with Thinking enabled
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
-
-    const contents = (messages || []).map((m: any) => ({
+    // 3. Prepare conversation contents (ensure it starts with a 'user' turn for Gemini API)
+    const rawContents = (messages || []).map((m: any) => ({
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.content }]
     }));
+    const firstUserIdx = rawContents.findIndex((c: any) => c.role === 'user');
+    const contents = firstUserIdx >= 0 ? rawContents.slice(firstUserIdx) : rawContents;
 
-    const geminiRes = await fetch(geminiUrl, {
+    // 4. Call Google Gemini 2.5 Flash API with Thinking enabled (with 1x retry on 503/429)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+    const payload = JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1500,
+        thinkingConfig: {
+          thinkingBudget: 1024
+        }
+      }
+    });
+
+    let geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1500,
-          thinkingConfig: {
-            thinkingBudget: 1024
-          }
-        }
-      })
+      body: payload
     });
+
+    if (geminiRes.status === 503 || geminiRes.status === 429) {
+      await new Promise((r) => setTimeout(r, 700));
+      geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload
+      });
+    }
+
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text();
+      return new Response(
+        JSON.stringify({ error: `Gemini API error (${geminiRes.status}): ${errBody}` }),
+        { status: geminiRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const geminiData = await geminiRes.json();
     const parts = geminiData.candidates?.[0]?.content?.parts || [];
     const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('') || 'No response generated';
 
-    // 4. Save to chat_logs
+    // 5. Save to chat_logs
     if (session_id) {
-      const lastUser = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+      const lastUser = (messages || []).filter((m: any) => m.role === 'user').pop()?.content || '';
       await supabase.from('chat_logs').insert([
         { session_id, role: 'user', content: lastUser },
         { session_id, role: 'assistant', content: replyText }

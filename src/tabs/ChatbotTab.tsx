@@ -124,10 +124,12 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
     }
 
     try {
-      const conversationHistory = newMessages.map(m => ({
-        role: m.role,
-        content: m.content
-      }));
+      const conversationHistory = newMessages
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({
+          role: m.role,
+          content: m.content
+        }));
 
       const reply = await sendChatMessage(conversationHistory, campaigns, targets, sessionId);
       const parsed = parseTaskBlock(reply);
@@ -190,15 +192,46 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
     );
   };
 
+  const handleNewChat = () => {
+    const newSid = 'session_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    localStorage.setItem('risa_chat_session_id', newSid);
+    setSessionId(newSid);
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: `Hey! I'm your **RISA Festival Growth AI Copilot** powered by Gemini 2.5 Flash Thinking. I analyze live funnel metrics, tasks, and targets strictly based on your 2025 dataset.\n\nTry asking any question, follow-up, or task proposal below!`,
+        taskStatus: 'pending'
+      }
+    ]);
+  };
+
+  const renderFormattedText = (text: string) => {
+    return text.split(/(\*\*[^*]+\*\*)/g).map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={idx} className="font-black text-[#F6C445]">{part.slice(2, -2)}</strong>;
+      }
+      return <React.Fragment key={idx}>{part}</React.Fragment>;
+    });
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-14rem)] min-h-[550px] bg-[#2B1613] border border-[#3E201B] rounded-3xl overflow-hidden shadow-2xl">
       {/* Disclaimer Header */}
       <div className="p-4 bg-[#1C0E0C] border-b border-[#3E201B] flex items-center justify-between text-xs text-[#C4ABA1]">
         <div className="flex items-center gap-2">
           <HelpCircle className="w-4 h-4 text-[#F6C445]" />
-          <span>Answers strictly based on 2025 festival dataset. Unanswerable questions are flagged.</span>
+          <span>Answers strictly based on live 2025 festival data. Unanswerable questions are flagged.</span>
         </div>
-        <span className="hidden sm:inline text-[11px] text-[#34D399] font-black uppercase">● Live Injected</span>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-[11px] text-[#34D399] font-black uppercase">● Gemini 2.5 Thinking</span>
+          <button
+            onClick={handleNewChat}
+            className="text-[11px] bg-[#2B1613] hover:bg-[#381D19] text-[#F6C445] border border-[#3E201B] px-3 py-1 rounded-full font-bold transition-colors"
+          >
+            New Chat
+          </button>
+        </div>
       </div>
 
       {/* Suggestion Chips (Rounded-full) */}
@@ -239,7 +272,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
               }`}
             >
               <div className="whitespace-pre-line prose prose-invert prose-xs">
-                {msg.content}
+                {msg.role === 'assistant' ? renderFormattedText(msg.content) : msg.content}
               </div>
 
               {msg.suggestedTask && (
