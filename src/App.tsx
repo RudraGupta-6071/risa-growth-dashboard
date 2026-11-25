@@ -1,0 +1,258 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sidebar, TabType } from './components/Sidebar';
+import { Footer } from './components/Footer';
+import { Toast } from './components/Toast';
+import { ResetConfirmModal } from './components/ResetConfirmModal';
+import { SettingsModal } from './components/SettingsModal';
+import { DashboardTab } from './tabs/DashboardTab';
+import { DiagnosisTab } from './tabs/DiagnosisTab';
+import { TasksTab } from './tabs/TasksTab';
+import { ChatbotTab } from './tabs/ChatbotTab';
+import { Campaign, Target, DailyMetric, Task } from './types';
+import { api } from './services/supabase';
+import { Search, ChevronRight, Menu } from 'lucide-react';
+
+export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Mobile sidebar state
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Modals & Toast State
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "RISA Festival '25 — Growth Dashboard";
+  }, []);
+
+  // Fetch all data
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [cData, tData, dData, taskData] = await Promise.all([
+        api.getCampaigns(),
+        api.getTargets(),
+        api.getDailyMetrics(),
+        api.getTasks(),
+      ]);
+      setCampaigns(cData);
+      setTargets(tData);
+      setDailyMetrics(dData);
+      setTasks(taskData);
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      console.error('Data load error:', err);
+      setError(err?.message || 'Failed to load data from Supabase/storage');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Update a campaign spend/recommendation (Live recompute across app)
+  const handleUpdateCampaign = async (id: number, updates: Partial<Campaign>) => {
+    try {
+      const updatedCampaigns = await api.updateCampaign(id, updates);
+      setCampaigns(updatedCampaigns);
+      setLastUpdated(new Date());
+      setToastMessage('Campaign updated — metrics recomputed live!');
+    } catch (err: any) {
+      console.error('Update campaign error:', err);
+      setToastMessage('Failed to update campaign');
+    }
+  };
+
+  // Reset to original data (Feature 1)
+  const handleConfirmReset = async () => {
+    setIsResetting(true);
+    try {
+      const reset = await api.resetCampaigns();
+      setCampaigns(reset);
+      setLastUpdated(new Date());
+      setIsResetModalOpen(false);
+      setToastMessage('Data reset to original 2025 values.');
+    } catch (err: any) {
+      console.error('Reset error:', err);
+      setToastMessage('Failed to reset data');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // Create Task
+  const handleCreateTask = async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const created = await api.createTask(task);
+      setTasks(prev => [created, ...prev]);
+      setToastMessage('Task added successfully!');
+    } catch (err: any) {
+      console.error('Create task error:', err);
+      setToastMessage('Failed to add task');
+    }
+  };
+
+  // Update Task
+  const handleUpdateTask = async (id: number, updates: Partial<Task>) => {
+    try {
+      const updatedTasks = await api.updateTask(id, updates);
+      setTasks(updatedTasks);
+    } catch (err: any) {
+      console.error('Update task error:', err);
+    }
+  };
+
+  // Delete Task
+  const handleDeleteTask = async (id: number) => {
+    try {
+      const remainingTasks = await api.deleteTask(id);
+      setTasks(remainingTasks);
+      setToastMessage('Task removed');
+    } catch (err: any) {
+      console.error('Delete task error:', err);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#241310] text-[#FFFFFF] flex selection:bg-[#F6C445] selection:text-[#140A09]">
+      {/* Template Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenResetModal={() => setIsResetModalOpen(true)}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
+        {/* Top Search Bar with rounded-full pill design */}
+        <div className="pt-6 pb-4 px-6 lg:px-10 border-b border-[#381B16] bg-[#1C0E0C]">
+          <div className="flex items-center justify-between gap-4">
+            {/* Search Input with pill container & bottom line */}
+            <div className="flex-1 max-w-xl">
+              <div className="flex items-center gap-3 px-4 py-2 bg-[#281613] rounded-full border border-[#3E201B] focus-within:border-[#F6C445] transition-colors">
+                <Search className="w-4 h-4 text-[#F6C445] shrink-0" />
+                <input
+                  type="text"
+                  placeholder="SEARCH CAMPAIGNS, FUNNEL METRICS, TASKS..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-xs font-bold tracking-wider text-[#FFFFFF] placeholder-[#C4ABA1]/60 focus:outline-none uppercase"
+                />
+              </div>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="lg:hidden p-2.5 rounded-full bg-[#381B16] text-[#F6C445]"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Breadcrumbs with rounded badge */}
+          <div className="flex items-center gap-2 mt-4 text-[11px] font-extrabold uppercase tracking-wider text-[#FFFFFF]">
+            <span className="px-2.5 py-1 bg-[#281613] text-[#F6C445] rounded-full border border-[#3E201B]">
+              RISA FESTIVAL 2025
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-[#F6C445]" />
+            <span className="text-[#C4ABA1]">
+              {activeTab === 'dashboard' && 'ATTENDEE GROWTH & FUNNEL DASHBOARD'}
+              {activeTab === 'diagnosis' && 'CAMPAIGN LEADERBOARD & CAC DIAGNOSIS'}
+              {activeTab === 'tasks' && 'OPERATIONAL EXECUTION CHECKLIST'}
+              {activeTab === 'chatbot' && 'LIVE AI COPILOT & DATA EXPLORER'}
+            </span>
+          </div>
+        </div>
+
+        {/* Content Tabs */}
+        <main className="p-6 lg:p-10 flex-1">
+          {activeTab === 'dashboard' && (
+            <DashboardTab
+              campaigns={campaigns}
+              targets={targets}
+              dailyMetrics={dailyMetrics}
+              loading={loading}
+              error={error}
+              lastUpdated={lastUpdated}
+              onRefresh={loadData}
+            />
+          )}
+
+          {activeTab === 'diagnosis' && (
+            <DiagnosisTab
+              campaigns={campaigns}
+              onUpdateCampaign={handleUpdateCampaign}
+              onOpenResetModal={() => setIsResetModalOpen(true)}
+              loading={loading}
+            />
+          )}
+
+          {activeTab === 'tasks' && (
+            <TasksTab
+              tasks={tasks}
+              campaigns={campaigns}
+              onCreateTask={handleCreateTask}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              loading={loading}
+            />
+          )}
+
+          {activeTab === 'chatbot' && (
+            <ChatbotTab
+              campaigns={campaigns}
+              targets={targets}
+              onTaskCreated={handleCreateTask}
+              onShowToast={msg => setToastMessage(msg)}
+            />
+          )}
+        </main>
+
+        {/* Footer */}
+        <Footer />
+      </div>
+
+      {/* Reset Confirmation Modal */}
+      <ResetConfirmModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirm={handleConfirmReset}
+        loading={isResetting}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onConfigChanged={loadData}
+      />
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setToastMessage(null)}
+        />
+      )}
+    </div>
+  );
+};

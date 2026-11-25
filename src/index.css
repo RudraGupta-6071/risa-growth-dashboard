@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  body {
+    background-color: #241310;
+    color: #FFFFFF;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+}
+
+/* Custom rounded scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #140A09;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3E201B;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #F6C445;
+}
