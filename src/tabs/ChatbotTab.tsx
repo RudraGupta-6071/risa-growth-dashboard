@@ -27,6 +27,8 @@ interface MessageItem {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  thought?: string;
+  showThought?: boolean;
   suggestedTask?: SuggestedTask | null;
   taskStatus?: 'pending' | 'confirmed' | 'dismissed';
 }
@@ -134,7 +136,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
           content: m.content
         }));
 
-      const reply = await sendChatMessage(conversationHistory, campaigns, targets, sessionId);
+      const { reply, thought } = await sendChatMessage(conversationHistory, campaigns, targets, sessionId);
       const parsed = parseTaskBlock(reply);
       const assistantMsgId = 'reply_' + Date.now();
 
@@ -144,6 +146,8 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
           id: assistantMsgId,
           role: 'assistant',
           content: parsed.cleanText,
+          thought,
+          showThought: false,
           suggestedTask: parsed.task,
           taskStatus: 'pending'
         }
@@ -282,6 +286,27 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
                   : 'bg-[#1C0E0C] border border-[#3E201B] text-[#FFFFFF] rounded-tl-none shadow-md'
               }`}
             >
+              {msg.thought && (
+                <div className="mb-2">
+                  <button
+                    onClick={() =>
+                      setMessages(prev =>
+                        prev.map(m => (m.id === msg.id ? { ...m, showThought: !m.showThought } : m))
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#F6C445] bg-[#2B1613] hover:bg-[#381D19] border border-[#3E201B] px-2.5 py-1 rounded-full transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>{msg.showThought ? 'Hide Thinking Process' : 'View Thinking Process'}</span>
+                  </button>
+                  {msg.showThought && (
+                    <div className="mt-2 p-3 bg-[#140A09] border border-[#3E201B] rounded-2xl text-[11px] text-[#C4ABA1] whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
+                      {msg.thought}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="whitespace-pre-line prose prose-invert prose-xs">
                 {msg.role === 'assistant' ? renderFormattedText(msg.content) : msg.content}
               </div>

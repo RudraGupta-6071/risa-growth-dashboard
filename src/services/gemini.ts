@@ -385,13 +385,18 @@ My role is to analyze real-time campaign performance, model CAC economics, ident
 You can ask me to diagnose any channel (e.g. *"Diagnose Creator Partners"*), compare channels (*"Compare Paid Social and Referrals"*), explain bottlenecks (*"Where are we losing attendees?"*), or create tasks (*"Create a task to cut Creator Partners"*).`;
 };
 
+export interface ChatReply {
+  reply: string;
+  thought?: string;
+}
+
 // Send message to Supabase Edge Function (secure, hides Gemini key) -> Direct Gemini -> Fallback
 export const sendChatMessage = async (
   messages: ChatMessage[],
   campaigns: Campaign[],
   targets: Target[],
   sessionId: string
-): Promise<string> => {
+): Promise<ChatReply> => {
   const { url, anonKey, geminiKey } = getStoredConfig();
 
   // 1. Try Supabase Edge Function first (keeps GEMINI_API_KEY 100% hidden on server)
@@ -416,18 +421,18 @@ export const sendChatMessage = async (
 
       if (res.ok) {
         const data = await res.json();
-        if (data.reply) return data.reply;
+        if (data.reply) return { reply: data.reply, thought: data.thought };
       }
     } catch (e) {
       console.warn('Edge function not reachable, trying direct Gemini API...', e);
     }
   }
 
-  // 2. Try direct Google Gemini 2.5 Flash API if Gemini API Key is provided locally
+  // 2. Try direct Google Gemini API if Gemini API Key is provided locally
   if (geminiKey) {
     try {
       const systemInstruction = buildSystemPrompt(campaigns, targets);
-      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`;
 
       const contents = messages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
@@ -441,9 +446,10 @@ export const sendChatMessage = async (
         contents: contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1500,
+          maxOutputTokens: 1800,
           thinkingConfig: {
-            thinkingBudget: 1024
+            thinkingBudget: 1024,
+            includeThoughts: true
           }
         }
       };
@@ -457,15 +463,16 @@ export const sendChatMessage = async (
       if (res.ok) {
         const data = await res.json();
         const parts = data.candidates?.[0]?.content?.parts || [];
-        const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('');
-        if (replyText) return replyText;
+        const thoughtText = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('\n').trim();
+        const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('').trim();
+        if (replyText) return { reply: replyText, thought: thoughtText || undefined };
       }
     } catch (e) {
       console.warn('Direct Gemini API call failed, using built-in engine:', e);
     }
   }
 
-  // 2. Built-in Deterministic Engine with exact system prompt rules
+  // 3. Built-in Deterministic Engine with exact system prompt rules
   const lastUserMsg = messages.filter(m => m.role === 'user').pop()?.content || '';
-  return fallbackChatEngine(lastUserMsg, campaigns, targets);
+  return { reply: fallbackChatEngine(lastUserMsg, campaigns, targets) };
 };

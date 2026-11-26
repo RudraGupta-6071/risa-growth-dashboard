@@ -119,7 +119,7 @@ RULES
     const firstUserIdx = rawContents.findIndex((c: any) => c.role === 'user');
     const contents = firstUserIdx >= 0 ? rawContents.slice(firstUserIdx) : rawContents;
 
-    // 4. Call Google Gemini API with Thinking enabled (rotates across healthy models on 429/503)
+    // 4. Call Google Gemini API with Thinking enabled (includeThoughts: true)
     const callGemini = async (model: string, thinkingBudget: number) => {
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
       const payload = JSON.stringify({
@@ -127,21 +127,20 @@ RULES
         contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1200,
-          ...(thinkingBudget > 0 ? { thinkingConfig: { thinkingBudget } } : {})
+          maxOutputTokens: 1800,
+          ...(thinkingBudget > 0 ? { thinkingConfig: { thinkingBudget, includeThoughts: true } } : {})
         }
       });
       return fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: payload,
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(15000)
       });
     };
 
     const modelsToTry = [
       'gemini-3-flash-preview',
-      'gemini-3.6-flash',
       'gemini-3.8-flash',
       'gemini-3.1-flash-lite',
       'gemini-2.5-flash'
@@ -150,7 +149,7 @@ RULES
     let geminiRes: Response | null = null;
     for (const model of modelsToTry) {
       try {
-        const res = await callGemini(model, 512);
+        const res = await callGemini(model, 1024);
         geminiRes = res;
         if (res.ok) break;
         if (res.status !== 429 && res.status !== 503 && res.status !== 404) break;
@@ -176,7 +175,8 @@ RULES
 
     const geminiData = await geminiRes.json();
     const parts = geminiData.candidates?.[0]?.content?.parts || [];
-    const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('') || 'No response generated';
+    const thoughtText = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('\n').trim();
+    const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('').trim() || 'No response generated';
 
     // 5. Save to chat_logs
     if (session_id) {
@@ -187,7 +187,7 @@ RULES
       ]);
     }
 
-    return new Response(JSON.stringify({ reply: replyText }), {
+    return new Response(JSON.stringify({ reply: replyText, thought: thoughtText || undefined }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
