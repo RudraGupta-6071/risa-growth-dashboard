@@ -57,11 +57,11 @@ WHAT YOU KNOW (sourced from the data)
 ═══════════════════════════════════════
 WEBSITE NAVIGATION & TABS (help users navigate)
 ═══════════════════════════════════════
-The left sidebar has 4 tabs and action buttons:
+The left sidebar has 3 tabs, and the AI Copilot is a floating expandable widget in the bottom-right corner:
 1. DASHBOARD tab: Shows 3 hero KPIs (Admitted Attendees vs 2,200 goal, Blended CAC, Budget Utilization), secondary metrics, the Pre-Event Funnel Trajectory chart (01-15 to Event Day 20 Apr 2025), and 3 bottom audit widgets (Funnel Conversion Stages, Budget Burn Metrics, Core Ratio Audit).
 2. DIAGNOSIS tab: Lists all 8 channels with spend, attendees, CAC, show-up rate, and Scale/Change/Stop tags. Click Edit on any campaign to test budget changes—all metrics and Copilot answers update live.
 3. TASK BOARD tab: Operational checklist with owners, due dates, priorities, and statuses. Tasks proposed here appear there after clicking Confirm & Add.
-4. AI COPILOT tab (here): Diagnoses performance, models what-if reallocations, guides users through the site, and creates tasks.
+4. Floating AI COPILOT ("Ask AI Copilot" button in bottom-right): Available on every page and expandable. Diagnoses performance, models what-if reallocations, guides users through the site, and creates tasks.
 - RESET 2025 DATA button (sidebar): Restores original 2025 values.
 - Top Bar: Search bar, "EVENT DAY: 20 APR 2025" badge, and "Download Presentation (.pptx)" button.
 
@@ -348,7 +348,7 @@ My role is to analyze real-time campaign performance, model CAC economics, ident
 1. **DASHBOARD (Sidebar Tab 1):** Your command overview—tracks Admitted Attendees (vs 2,200 goal), Blended CAC, Budget Utilization, the Pre-Event Funnel Trajectory chart (leading to Event Day **20 Apr 2025**), and 3 bottom audit widgets.
 2. **DIAGNOSIS (Sidebar Tab 2):** Compares all 8 channels side by side. Click **Edit** on any campaign to change its spend or attendees and watch CAC and Dashboard KPIs recalculate live.
 3. **TASK BOARD (Sidebar Tab 3):** Tracks action items, owners, priorities, and status (**open / in_progress / done**). Any task I suggest here is added there when you click **Confirm & Add**.
-4. **AI COPILOT (Sidebar Tab 4):** Ask me to diagnose channels, run budget reallocation math, or create tasks.
+4. **Floating AI COPILOT (Bottom-Right Pill):** Click **Ask AI Copilot** anytime (and use the expand icon to enlarge) to diagnose channels, run reallocation math, or create tasks without leaving your current tab.
 5. **RESET 2025 DATA & Top Bar:** Use **RESET 2025 DATA** in the sidebar to undo edits, or click **Download Presentation (.pptx)** in the top bar for the slide deck.`;
   }
 

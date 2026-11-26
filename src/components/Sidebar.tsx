@@ -1,16 +1,12 @@
 import React from 'react';
-import {
-  RotateCcw,
-  Settings
-} from 'lucide-react';
-import { getStoredConfig } from '../services/supabase';
+import { RotateCcw } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'diagnosis' | 'tasks' | 'chatbot';
 
 interface SidebarProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
   onOpenResetModal: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
@@ -19,19 +15,15 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
-  onOpenSettings,
   onOpenResetModal,
   isMobileOpen,
   setIsMobileOpen
 }) => {
-  const { url } = getStoredConfig();
-  const isSupabaseConfigured = Boolean(url);
 
   const navItems: { id: TabType; label: string }[] = [
     { id: 'dashboard', label: 'DASHBOARD' },
     { id: 'diagnosis', label: 'DIAGNOSIS' },
     { id: 'tasks', label: 'TASK BOARD' },
-    { id: 'chatbot', label: 'AI COPILOT' },
   ];
 
   const handleNavClick = (tab: TabType) => {
@@ -103,20 +95,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom Connection Status Strip */}
-        <div className="p-3 bg-[#1C0E0C] border border-[#381B16] rounded-2xl flex items-center justify-between text-xs">
+        <div className="p-3 bg-[#1C0E0C] border border-[#381B16] rounded-2xl flex items-center justify-center text-xs">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-[#34D399] animate-pulse" />
-            <span className="text-[11px] font-bold text-[#FFFFFF]">
+            <span className="text-[11px] font-bold text-[#FFFFFF] tracking-wider">
               GROWTH ENGINE LIVE
             </span>
           </div>
-          <button
-            onClick={onOpenSettings}
-            className="text-[10px] text-[#C4ABA1] hover:text-[#F6C445] font-semibold px-2 py-0.5 rounded-full bg-[#281613] border border-[#381B16] transition-colors"
-            title="Database & Engine Status"
-          >
-            INFO
-          </button>
         </div>
       </aside>
     </>
