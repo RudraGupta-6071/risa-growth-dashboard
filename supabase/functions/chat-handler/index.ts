@@ -119,7 +119,7 @@ RULES
     const firstUserIdx = rawContents.findIndex((c: any) => c.role === 'user');
     const contents = firstUserIdx >= 0 ? rawContents.slice(firstUserIdx) : rawContents;
 
-    // 4. Call Google Gemini API with Thinking enabled (fast primary + fallback)
+    // 4. Call Google Gemini API with Thinking enabled (rotates across healthy models on 429/503)
     const callGemini = async (model: string, thinkingBudget: number) => {
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
       const payload = JSON.stringify({
@@ -135,14 +135,35 @@ RULES
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: payload,
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(8000)
       });
     };
 
-    let geminiRes = await callGemini('gemini-3.1-flash-lite', 512);
+    const modelsToTry = [
+      'gemini-3-flash-preview',
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash'
+    ];
 
-    if (geminiRes.status === 503 || geminiRes.status === 429 || geminiRes.status === 404) {
-      geminiRes = await callGemini('gemini-2.5-flash', 512);
+    let geminiRes: Response | null = null;
+    for (const model of modelsToTry) {
+      try {
+        const res = await callGemini(model, 512);
+        geminiRes = res;
+        if (res.ok) break;
+        if (res.status !== 429 && res.status !== 503 && res.status !== 404) break;
+      } catch (_err) {
+        // Timeout or transient network error — try next model
+      }
+    }
+
+    if (!geminiRes) {
+      return new Response(
+        JSON.stringify({ error: 'All Gemini models timed out' }),
+        { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!geminiRes.ok) {
