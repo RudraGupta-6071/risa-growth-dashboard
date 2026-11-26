@@ -22,6 +22,7 @@ interface TasksTabProps {
   onUpdateTask: (id: number, updates: Partial<Task>) => Promise<void>;
   onDeleteTask: (id: number) => Promise<void>;
   loading: boolean;
+  searchQuery?: string;
 }
 
 export const TasksTab: React.FC<TasksTabProps> = ({
@@ -30,7 +31,8 @@ export const TasksTab: React.FC<TasksTabProps> = ({
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
-  loading
+  loading,
+  searchQuery = ''
 }) => {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -46,6 +48,17 @@ export const TasksTab: React.FC<TasksTabProps> = ({
   const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [editStatus, setEditStatus] = useState<'open' | 'in_progress' | 'done'>('open');
   const [editOwner, setEditOwner] = useState('');
+
+  const q = searchQuery.trim().toLowerCase();
+  const filteredTasks = q
+    ? tasks.filter(
+        t =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description || '').toLowerCase().includes(q) ||
+          (t.owner || '').toLowerCase().includes(q) ||
+          (t.campaign_name || '').toLowerCase().includes(q)
+      )
+    : tasks;
 
   const totalTasks = tasks.length;
   const openTasks = tasks.filter(t => t.status !== 'done').length;
@@ -207,7 +220,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#3E201B]/70">
-                {tasks.map(t => {
+                {filteredTasks.map(t => {
                   const isEditing = editingId === t.id;
                   const isDone = t.status === 'done';
 

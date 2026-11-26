@@ -27,25 +27,45 @@ interface DiagnosisTabProps {
   onUpdateCampaign: (id: number, updates: Partial<Campaign>) => Promise<void>;
   onOpenResetModal: () => void;
   loading: boolean;
+  searchQuery?: string;
 }
 
 type SortField = 'name' | 'spend_inr' | 'attendees' | 'cac_inr' | 'showup_rate' | 'registrations';
+
+const evaluateThreshold = (c: Campaign, cac: number, showup: number): 'scale' | 'change' | 'stop' => {
+  if (c.spend_inr === 0) return 'scale';
+  if (cac > 220 || (showup > 0 && showup < 60)) return 'stop';
+  if (cac >= 120 || (showup > 0 && showup < 75)) return 'change';
+  return 'scale';
+};
 
 export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
   campaigns,
   onUpdateCampaign,
   onOpenResetModal,
-  loading
+  loading,
+  searchQuery = ''
 }) => {
   const [sortField, setSortField] = useState<SortField>('cac_inr');
   const [sortAsc, setSortAsc] = useState<boolean>(true);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editSpend, setEditSpend] = useState<number>(0);
+  const [editAttendees, setEditAttendees] = useState<number>(0);
   const [editRecommendation, setEditRecommendation] = useState<'scale' | 'change' | 'stop'>('scale');
   const [saving, setSaving] = useState(false);
 
   const sortedCampaigns = useMemo(() => {
-    return [...campaigns].sort((a, b) => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? campaigns.filter(
+          c =>
+            c.name.toLowerCase().includes(q) ||
+            c.channel_type.toLowerCase().includes(q) ||
+            c.recommendation.toLowerCase().includes(q)
+        )
+      : campaigns;
+
+    return [...filtered].sort((a, b) => {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
 
@@ -72,6 +92,7 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
   const startEdit = (c: Campaign) => {
     setEditingId(c.id);
     setEditSpend(c.spend_inr);
+    setEditAttendees(c.attendees);
     setEditRecommendation(c.recommendation);
   };
 
@@ -84,6 +105,7 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
     try {
       await onUpdateCampaign(id, {
         spend_inr: Number(editSpend),
+        attendees: Math.max(0, Number(editAttendees)),
         recommendation: editRecommendation
       });
       setEditingId(null);
@@ -313,7 +335,18 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
                         `₹${c.spend_inr.toLocaleString('en-IN')}`
                       )}
                     </td>
-                    <td className="py-4 px-3 font-bold text-[#FFFFFF]">{c.attendees.toLocaleString('en-IN')}</td>
+                    <td className="py-4 px-3 font-bold text-[#FFFFFF]">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editAttendees}
+                          onChange={e => setEditAttendees(Number(e.target.value))}
+                          className="w-20 bg-[#140A09] border border-[#F6C445] rounded-xl px-2.5 py-1 text-xs text-[#FFFFFF] focus:outline-none"
+                        />
+                      ) : (
+                        c.attendees.toLocaleString('en-IN')
+                      )}
+                    </td>
                     <td className="py-4 px-3 font-bold">
                       <span className={`px-2.5 py-1 rounded-full ${getCacBadge(cac)}`}>
                         ₹{cac}
@@ -340,7 +373,20 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
                           <option value="stop">🔴 Stop</option>
                         </select>
                       ) : (
-                        getRecommendationBadge(c.recommendation)
+                        <div className="flex flex-col items-start gap-1">
+                          {getRecommendationBadge(c.recommendation)}
+                          {(() => {
+                            const rule = evaluateThreshold(c, cac, Number(showup));
+                            if (rule !== c.recommendation) {
+                              return (
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#F6C445]/20 text-[#F6C445] border border-[#F6C445]/40">
+                                  THRESHOLD → {rule}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                       )}
                     </td>
                     <td className="py-4 px-5 text-right">

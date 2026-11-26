@@ -181,6 +181,38 @@ export const api = {
     return getLocal<Target[]>(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
   },
 
+  async updateTarget(metric: string, revised_goal: number): Promise<Target[]> {
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { error } = await client.from('targets').update({ revised_goal }).eq('metric', metric);
+        if (!error) return this.getTargets();
+      } catch (err) {
+        console.warn('Supabase target update failed, updating local:', err);
+      }
+    }
+    const local = getLocal<Target[]>(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
+    const updated = local.map(t => (t.metric === metric ? { ...t, revised_goal } : t));
+    setLocal(STORAGE_KEY_TARGETS, updated);
+    return updated;
+  },
+
+  async resetTargets(): Promise<Target[]> {
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        for (const t of INITIAL_TARGETS) {
+          await client.from('targets').update({ revised_goal: t.revised_goal }).eq('metric', t.metric);
+        }
+        return this.getTargets();
+      } catch (err) {
+        console.warn('Supabase targets reset failed, resetting local:', err);
+      }
+    }
+    setLocal(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
+    return INITIAL_TARGETS;
+  },
+
   // Daily Metrics
   async getDailyMetrics(): Promise<DailyMetric[]> {
     const client = getSupabaseClient();

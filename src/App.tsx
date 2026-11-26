@@ -83,16 +83,54 @@ export const App: React.FC = () => {
   const handleConfirmReset = async () => {
     setIsResetting(true);
     try {
-      const reset = await api.resetCampaigns();
-      setCampaigns(reset);
+      const [resetC, resetT] = await Promise.all([
+        api.resetCampaigns(),
+        api.resetTargets()
+      ]);
+      setCampaigns(resetC);
+      setTargets(resetT);
       setLastUpdated(new Date());
       setIsResetModalOpen(false);
-      setToastMessage('Data reset to original 2025 values.');
+      setToastMessage('Data & constraints reset to original 2025 values.');
     } catch (err: any) {
       console.error('Reset error:', err);
       setToastMessage('Failed to reset data');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  // Update target constraints (Budget / Attendee Goal)
+  const handleUpdateTarget = async (metric: string, revisedGoal: number) => {
+    try {
+      const updated = await api.updateTarget(metric, revisedGoal);
+      setTargets(updated);
+      setLastUpdated(new Date());
+      setToastMessage('Constraint updated — dashboard & Copilot synced!');
+    } catch (err: any) {
+      console.error('Update target error:', err);
+      setToastMessage('Failed to update constraint');
+    }
+  };
+
+  // Apply budget reallocation between two campaigns
+  const handleApplyReallocation = async (
+    fromId: number,
+    fromNewSpend: number,
+    fromNewAttendees: number,
+    toId: number,
+    toNewSpend: number,
+    toNewAttendees: number
+  ) => {
+    try {
+      await api.updateCampaign(fromId, { spend_inr: fromNewSpend, attendees: fromNewAttendees, recommendation: 'stop' });
+      const updated = await api.updateCampaign(toId, { spend_inr: toNewSpend, attendees: toNewAttendees, recommendation: 'scale' });
+      setCampaigns(updated);
+      setLastUpdated(new Date());
+      setToastMessage('Budget reallocation applied live!');
+    } catch (err: any) {
+      console.error('Reallocation error:', err);
+      setToastMessage('Failed to apply reallocation');
     }
   };
 
@@ -162,13 +200,13 @@ export const App: React.FC = () => {
 
             {/* Download PPTX Button */}
             <a
-              href={`${import.meta.env.BASE_URL}RISA_Growth_APM_Presentation.pptx`}
-              download="RISA_Growth_APM_Presentation.pptx"
+              href={`${import.meta.env.BASE_URL}RISA_3_Slide_Strategy_Deck.pptx`}
+              download="RISA_3_Slide_Strategy_Deck.pptx"
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-[#F6C445] hover:bg-[#FFD15C] text-[#140A09] text-xs font-black rounded-full shadow-lg transition-transform hover:scale-105 uppercase tracking-wider shrink-0 cursor-pointer"
-              title="Download 8-Slide Visual Presentation (.pptx)"
+              title="Download 3-Slide Strategy Presentation (.pptx)"
             >
               <Presentation className="w-3.5 h-3.5" />
-              <span>Download Presentation (.pptx)</span>
+              <span>Download 3-Slide Deck (.pptx)</span>
             </a>
 
             {/* Mobile Menu Button */}
@@ -209,6 +247,8 @@ export const App: React.FC = () => {
               error={error}
               lastUpdated={lastUpdated}
               onRefresh={loadData}
+              onUpdateTarget={handleUpdateTarget}
+              onApplyReallocation={handleApplyReallocation}
             />
           )}
 
@@ -218,6 +258,7 @@ export const App: React.FC = () => {
               onUpdateCampaign={handleUpdateCampaign}
               onOpenResetModal={() => setIsResetModalOpen(true)}
               loading={loading}
+              searchQuery={searchQuery}
             />
           )}
 
@@ -229,6 +270,7 @@ export const App: React.FC = () => {
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
               loading={loading}
+              searchQuery={searchQuery}
             />
           )}
 

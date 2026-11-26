@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Sliders,
+  Check,
+  X,
+  ArrowRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -22,6 +26,15 @@ interface DashboardTabProps {
   error?: string | null;
   lastUpdated: Date;
   onRefresh: () => void;
+  onUpdateTarget?: (metric: string, revisedGoal: number) => Promise<void>;
+  onApplyReallocation?: (
+    fromId: number,
+    fromNewSpend: number,
+    fromNewAttendees: number,
+    toId: number,
+    toNewSpend: number,
+    toNewAttendees: number
+  ) => Promise<void>;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -31,8 +44,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   loading,
   error,
   lastUpdated,
-  onRefresh
+  onRefresh,
+  onUpdateTarget,
+  onApplyReallocation
 }) => {
+  const [editingConstraints, setEditingConstraints] = useState(false);
+  const [goalInput, setGoalInput] = useState<number>(2200);
+  const [budgetInput, setBudgetInput] = useState<number>(300000);
+  const [savingConstraints, setSavingConstraints] = useState(false);
+  const [shiftAmount, setShiftAmount] = useState<number>(28000);
+  const [applyingShift, setApplyingShift] = useState(false);
+
+  const attendeesTargetObj = targets.find(t => t.metric === 'attendees');
+  const budgetTargetObj = targets.find(t => t.metric === 'budget_inr');
+
+  useEffect(() => {
+    if (attendeesTargetObj) setGoalInput(attendeesTargetObj.revised_goal);
+    if (budgetTargetObj) setBudgetInput(budgetTargetObj.revised_goal);
+  }, [attendeesTargetObj, budgetTargetObj]);
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-[#C4ABA1]">
@@ -374,6 +403,183 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             STATUS: ACTIVE DEMO EVALUATION
           </div>
         </div>
+      </div>
+
+      {/* SECTION 4: Interactive Constraints & What-If Budget Reallocation Simulator */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Editable Constraints Panel */}
+        <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider">
+              <Sliders className="w-3.5 h-3.5 text-[#F6C445]" />
+              <span>LIVE CONSTRAINTS (BUDGET & GOAL)</span>
+            </div>
+            {!editingConstraints ? (
+              <button
+                onClick={() => setEditingConstraints(true)}
+                className="text-[11px] font-black text-[#F6C445] bg-[#1C0E0C] hover:bg-[#381D19] border border-[#3E201B] px-3 py-1 rounded-full transition-colors"
+              >
+                EDIT CONSTRAINTS
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  disabled={savingConstraints}
+                  onClick={async () => {
+                    if (!onUpdateTarget) return;
+                    setSavingConstraints(true);
+                    try {
+                      await onUpdateTarget('attendees', Math.max(100, Number(goalInput)));
+                      await onUpdateTarget('budget_inr', Math.max(10000, Number(budgetInput)));
+                      setEditingConstraints(false);
+                    } finally {
+                      setSavingConstraints(false);
+                    }
+                  }}
+                  className="p-1.5 rounded-full bg-[#34D399]/20 text-[#34D399] hover:bg-[#34D399]/30"
+                  title="Save constraints"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  disabled={savingConstraints}
+                  onClick={() => setEditingConstraints(false)}
+                  className="p-1.5 rounded-full bg-[#F87171]/20 text-[#F87171] hover:bg-[#F87171]/30"
+                  title="Cancel"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-[#1C0E0C] border border-[#3E201B] rounded-2xl">
+              <div className="text-[10px] font-bold text-[#C4ABA1] uppercase mb-1">Attendee Target</div>
+              {editingConstraints ? (
+                <input
+                  type="number"
+                  value={goalInput}
+                  onChange={e => setGoalInput(Number(e.target.value))}
+                  className="w-full bg-[#140A09] border border-[#F6C445] rounded-xl px-2.5 py-1.5 text-sm font-black text-[#FFFFFF] focus:outline-none"
+                />
+              ) : (
+                <div className="text-xl font-black text-[#F6C445]">{attendeesTarget.revised_goal.toLocaleString('en-IN')}</div>
+              )}
+              <div className="text-[10px] text-[#C4ABA1] mt-1">
+                Gap: <span className="font-bold text-[#FFFFFF]">{Math.max(0, attendeesTarget.revised_goal - totalAttendees)}</span> needed
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#1C0E0C] border border-[#3E201B] rounded-2xl">
+              <div className="text-[10px] font-bold text-[#C4ABA1] uppercase mb-1">Max Budget (₹)</div>
+              {editingConstraints ? (
+                <input
+                  type="number"
+                  step={5000}
+                  value={budgetInput}
+                  onChange={e => setBudgetInput(Number(e.target.value))}
+                  className="w-full bg-[#140A09] border border-[#F6C445] rounded-xl px-2.5 py-1.5 text-sm font-black text-[#FFFFFF] focus:outline-none"
+                />
+              ) : (
+                <div className="text-xl font-black text-[#FFFFFF]">₹{budgetTarget.revised_goal.toLocaleString('en-IN')}</div>
+              )}
+              <div className="text-[10px] text-[#C4ABA1] mt-1">
+                Buffer: <span className={`font-bold ${remainingSpend < 0 ? 'text-[#F87171]' : 'text-[#34D399]'}`}>₹{remainingSpend.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-[10px] text-[#C4ABA1]">
+            Evaluator Test: Change budget or attendee goal here, then ask the Copilot how to adapt.
+          </div>
+        </div>
+
+        {/* What-If Budget Reallocation Simulator */}
+        {(() => {
+          const paidSocial = campaigns.find(c => c.name.toLowerCase().includes('paid social')) || campaigns[0];
+          const ambassadors = campaigns.find(c => c.name.toLowerCase().includes('ambassador')) || campaigns[1];
+          const psCac = paidSocial && paidSocial.attendees > 0 ? paidSocial.spend_inr / paidSocial.attendees : 274;
+          const ambCac = ambassadors && ambassadors.attendees > 0 ? ambassadors.spend_inr / ambassadors.attendees : 108;
+          const maxShift = Math.min(60000, paidSocial ? paidSocial.spend_inr : 60000);
+          const clampedShift = Math.min(shiftAmount, maxShift);
+          const lostFromPs = Math.floor(clampedShift / psCac);
+          const gainedInAmb = Math.floor(clampedShift / ambCac);
+          const netDelta = gainedInAmb - lostFromPs;
+          const simAttendees = totalAttendees + netDelta;
+          const simCac = simAttendees > 0 ? Math.round(totalSpend / simAttendees) : 0;
+
+          return (
+            <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider">
+                  <span className="text-[#F6C445]">WHAT-IF SIMULATOR</span>
+                  <span className="text-[#C4ABA1]">(PAID SOCIAL → AMBASSADORS)</span>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#F6C445]/15 text-[#F6C445]">
+                  ASSUMPTION: CONSTANT CAC
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1.5">
+                    <span className="text-[#C4ABA1]">Shift Budget Amount:</span>
+                    <span className="text-[#F6C445] font-black">₹{clampedShift.toLocaleString('en-IN')}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={maxShift}
+                    step={2000}
+                    value={clampedShift}
+                    onChange={e => setShiftAmount(Number(e.target.value))}
+                    className="w-full accent-[#F6C445] cursor-pointer"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2.5 text-center">
+                  <div className="p-2.5 bg-[#1C0E0C] border border-[#3E201B] rounded-2xl">
+                    <div className="text-[10px] text-[#C4ABA1] font-bold">NET GAIN</div>
+                    <div className="text-base font-black text-[#34D399]">+{netDelta}</div>
+                  </div>
+                  <div className="p-2.5 bg-[#1C0E0C] border border-[#3E201B] rounded-2xl">
+                    <div className="text-[10px] text-[#C4ABA1] font-bold">SIM ATTENDEES</div>
+                    <div className="text-base font-black text-[#F6C445]">{simAttendees.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div className="p-2.5 bg-[#1C0E0C] border border-[#3E201B] rounded-2xl">
+                    <div className="text-[10px] text-[#C4ABA1] font-bold">NEW CAC</div>
+                    <div className="text-base font-black text-[#FFFFFF]">₹{simCac}</div>
+                  </div>
+                </div>
+              </div>
+
+              {onApplyReallocation && paidSocial && ambassadors && (
+                <button
+                  disabled={applyingShift || clampedShift === 0}
+                  onClick={async () => {
+                    setApplyingShift(true);
+                    try {
+                      await onApplyReallocation(
+                        paidSocial.id,
+                        Math.max(0, paidSocial.spend_inr - clampedShift),
+                        Math.max(0, paidSocial.attendees - lostFromPs),
+                        ambassadors.id,
+                        ambassadors.spend_inr + clampedShift,
+                        ambassadors.attendees + gainedInAmb
+                      );
+                    } finally {
+                      setApplyingShift(false);
+                    }
+                  }}
+                  className="mt-4 w-full py-2 bg-[#F6C445] hover:bg-[#FFD15C] disabled:opacity-50 text-[#140A09] font-black text-xs uppercase tracking-wider rounded-full flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <span>{applyingShift ? 'Applying...' : `Apply ₹${(clampedShift / 1000).toFixed(0)}K Shift Live`}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
