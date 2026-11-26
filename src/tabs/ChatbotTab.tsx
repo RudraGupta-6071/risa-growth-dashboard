@@ -43,6 +43,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const suggestionChips = [
+    'How do I navigate this dashboard?',
     'Why is Paid Social underperforming?',
     'Which campaign has the best CAC?',
     'How many attendees are we short of the revised goal?',
