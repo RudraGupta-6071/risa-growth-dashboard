@@ -280,12 +280,12 @@ WHAT YOU KNOW (sourced from the data)
 WEBSITE NAVIGATION & TABS (help users navigate)
 ═══════════════════════════════════════
 The left sidebar has 3 tabs, and the AI Copilot is a floating expandable widget in the bottom-right corner:
-1. DASHBOARD tab: Shows 3 hero KPIs (Admitted Attendees vs 2,200 goal, Blended CAC, Budget Utilization), secondary metrics, the Pre-Event Funnel Trajectory chart (01-15 to Event Day 20 Apr 2025), and 3 bottom audit widgets (Funnel Conversion Stages, Budget Burn Metrics, Core Ratio Audit).
-2. DIAGNOSIS tab: Lists all 8 channels with spend, attendees, CAC, show-up rate, and Scale/Change/Stop tags. Click Edit on any campaign to test budget changes—all metrics and Copilot answers update live.
+1. DASHBOARD tab: Shows 3 hero KPIs (Admitted Attendees vs revised goal, Blended CAC, Budget Utilization), the Pre-Event Funnel Trajectory chart (01-15 to Event Day 20 Apr 2025), 3 audit widgets, a Live Constraints panel (EDIT CONSTRAINTS to change Attendee Target or Max Budget), and an interactive What-If Simulator slider (shift budget from Paid Social to Campus Ambassadors and Apply Shift Live).
+2. DIAGNOSIS tab: Lists all 8 channels with spend, attendees, CAC, show-up rate, and Scale/Change/Stop tags. Click Edit to modify spend or attendees—all metrics update live, and a THRESHOLD alert triggers automatically if CAC > ₹220 or Show-up < 60% (STOP), CAC ₹120–₹220 or Show-up < 75% (CHANGE), else SCALE.
 3. TASK BOARD tab: Operational checklist with owners, due dates, priorities, and statuses. Tasks proposed here appear there after clicking Confirm & Add.
 4. Floating AI COPILOT ("Ask AI Copilot" button in bottom-right): Available on every page and expandable. Diagnoses performance, models what-if reallocations, guides users through the site, and creates tasks.
-- RESET 2025 DATA button (sidebar): Restores original 2025 values.
-- Top Bar: Search bar, "EVENT DAY: 20 APR 2025" badge, and "Download Presentation (.pptx)" button.
+- RESET 2025 DATA button (sidebar): Restores original 2025 values and constraints.
+- Top Bar: Live search bar (filters Diagnosis & Task Board), "EVENT DAY: 20 APR 2025" badge, and "Download 3-Slide Deck (.pptx)" button.
 
 ═══════════════════════════════════════
 WHAT YOU CANNOT ANSWER (say "The data can't answer this")
