@@ -119,33 +119,30 @@ RULES
     const firstUserIdx = rawContents.findIndex((c: any) => c.role === 'user');
     const contents = firstUserIdx >= 0 ? rawContents.slice(firstUserIdx) : rawContents;
 
-    // 4. Call Google Gemini 2.5 Flash API with Thinking enabled (with 1x retry on 503/429)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
-    const payload = JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1500,
-        thinkingConfig: {
-          thinkingBudget: 1024
+    // 4. Call Google Gemini API with Thinking enabled (fast primary + fallback)
+    const callGemini = async (model: string, thinkingBudget: number) => {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+      const payload = JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1200,
+          ...(thinkingBudget > 0 ? { thinkingConfig: { thinkingBudget } } : {})
         }
-      }
-    });
-
-    let geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
-
-    if (geminiRes.status === 503 || geminiRes.status === 429) {
-      await new Promise((r) => setTimeout(r, 700));
-      geminiRes = await fetch(geminiUrl, {
+      });
+      return fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: payload
+        body: payload,
+        signal: AbortSignal.timeout(15000)
       });
+    };
+
+    let geminiRes = await callGemini('gemini-3.1-flash-lite', 512);
+
+    if (geminiRes.status === 503 || geminiRes.status === 429 || geminiRes.status === 404) {
+      geminiRes = await callGemini('gemini-2.5-flash', 512);
     }
 
     if (!geminiRes.ok) {
