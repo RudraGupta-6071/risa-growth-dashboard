@@ -185,25 +185,42 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
       {/* SECTION 2: Central Wave Chart (Rounded-3xl container) */}
       <div className="bg-[#2B1613] border border-[#3E201B] p-6 lg:p-8 rounded-3xl shadow-xl">
-        {/* Section Header with arrow */}
-        <div className="flex items-center gap-2 mb-6 text-xs font-black tracking-wider text-[#FFFFFF] uppercase">
-          <span>REGISTRATION & ADMITTED TRAJECTORY</span>
-          <ChevronRight className="w-4 h-4 text-[#F6C445]" />
-          <span className="text-[#C4ABA1]">30-DAY PRE-EVENT BUILDUP (APRIL 2025)</span>
+        {/* Section Header with Legend */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-2 text-xs font-black tracking-wider text-[#FFFFFF] uppercase">
+            <span>PRE-EVENT FUNNEL TRAJECTORY</span>
+            <ChevronRight className="w-4 h-4 text-[#F6C445]" />
+            <span className="text-[#C4ABA1]">CUMULATIVE SIGN-UPS VS EVENT-DAY CHECK-INS</span>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] font-bold">
+            <span className="flex items-center gap-1.5 text-[#FFFFFF]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FFFFFF]" /> Registrations
+            </span>
+            <span className="flex items-center gap-1.5 text-[#34D399]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#34D399]" /> Confirmed
+            </span>
+            <span className="flex items-center gap-1.5 text-[#F6C445]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F6C445]" /> Admitted (Gate)
+            </span>
+          </div>
         </div>
 
-        {/* Smooth Wave Area Chart */}
+        {/* Monotone Area Chart (never overshoots below 0) */}
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={dailyMetrics} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <defs>
+                <linearGradient id="regWave" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0.0} />
+                </linearGradient>
+                <linearGradient id="confWave" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#34D399" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#34D399" stopOpacity={0.0} />
+                </linearGradient>
                 <linearGradient id="yellowWave" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#F6C445" stopOpacity={0.85} />
                   <stop offset="95%" stopColor="#F6C445" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="darkWave" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#140A09" stopOpacity={0.9} />
-                  <stop offset="95%" stopColor="#140A09" stopOpacity={0.3} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#3E201B" strokeDasharray="0" vertical={false} />
@@ -219,6 +236,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 fontSize={10}
                 tickLine={false}
                 axisLine={false}
+                domain={[0, 3000]}
                 ticks={[0, 500, 1000, 1500, 2000, 2500, 3000]}
               />
               <Tooltip
@@ -231,18 +249,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 }}
               />
               <Area
-                type="natural"
+                type="monotone"
                 dataKey="registrations"
-                name="Registrations"
-                stroke="#140A09"
-                strokeWidth={2}
+                name="Cumulative Registrations"
+                stroke="#FFFFFF"
+                strokeWidth={2.5}
                 fillOpacity={1}
-                fill="url(#darkWave)"
+                fill="url(#regWave)"
               />
               <Area
-                type="natural"
+                type="monotone"
+                dataKey="confirmed"
+                name="Cumulative Confirmed"
+                stroke="#34D399"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                fillOpacity={1}
+                fill="url(#confWave)"
+              />
+              <Area
+                type="monotone"
                 dataKey="admitted"
-                name="Admitted"
+                name="Event-Day Admitted"
                 stroke="#F6C445"
                 strokeWidth={3}
                 fillOpacity={1}
