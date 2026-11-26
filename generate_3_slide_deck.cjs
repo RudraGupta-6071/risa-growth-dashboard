@@ -133,7 +133,7 @@ async function buildThreeSlideDeck() {
       x: 0.72, y: 4.28, w: 3.8, h: 0.2,
       fontFace: FONT, fontSize: 8, bold: true, color: C.gold
     });
-    slide.addText('5.38L students across 1,148 colleges provide dense club networks.\nNamma Metro connects 82% of priority campuses within 40 mins.', {
+    slide.addText('5.38L students (2018–19 C&W) across 1,148 colleges (AISHE 2023–24).\nNamma Metro Purple & Green lines connect priority campuses via Majestic.', {
       x: 0.72, y: 4.48, w: 3.85, h: 0.56,
       fontFace: FONT, fontSize: 8, color: C.cream, lineSpacing: 12
     });
