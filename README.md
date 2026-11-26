@@ -97,9 +97,10 @@ The **INR 1,25,000** sum across the 5 initiatives is **not** incremental spend o
   3. **Total Admission Capacity Cap (~140):** Even if gross demand exceeds `2,500`, total festival admissions are capped at `2,500`.
 - **Measurement:** In live execution, actual unique incremental attendees are deduplicated and measured via **unique check-in IDs** and **channel-tagged QR/referral codes**, rather than relying on the planning assumption.
 
-### Explicit Tradeoffs (What We Cut)
-- **Paid Social (Meta Ads):** `INR 93,000` spend, `340` attendees, **INR 274 CAC**, `240` no-shows (`58.62%` show-up). Action: **Cut spend by 30%** and reallocate to lowest-CAC scalable channels.
-- **Creator Partners:** `INR 59,000` spend, `175` attendees, **INR 337 CAC**, `115` no-shows (`60.34%` show-up). Action: **Stop / Freeze** immediately.
+### Explicit Tradeoffs (What We Cut & +190 Payoff Math)
+- **Paid Social (Meta Ads):** `INR 93,000` spend, `340` attendees, **INR 274 CAC**, `240` no-shows (`58.62%` actual show-up; part of the `600`-person paid registration-to-admission gap). Action: **Cut spend by 30% (`-INR 28,000`, `-102` paid attendees)** and reallocate to lowest-CAC scalable channels.
+- **Creator Partners:** `INR 59,000` spend, `175` attendees, **INR 337 CAC**, `115` no-shows (`60.34%` actual show-up). Action: **Stop / Freeze** immediately.
+- **Reallocation Math (`+190` Net at `INR 0` Extra Budget):** Shifting `INR 28,000` from Paid Social (`INR 274` CAC -> `-102` attendees) into Referrals/Clubs/Ambassadors (`~INR 96` avg CAC -> `+292` attendees) yields **`+190` net attendees** (`292 - 102`). This `+190` is **included within** the `+450` net stretch lift, not additive on top of it.
 
 ---
 
@@ -109,9 +110,9 @@ Thresholds are anchored to the **INR 120 stretch CAC benchmark** (`3,00,000 / 2,
 
 | Tier | Thresholds | Early Signals | Team Action | AI Copilot Role |
 | :--- | :--- | :--- | :--- | :--- |
-| Scale | CAC < INR 120 and Show-up >= 75% | Clubs confirming bus contingents; referral `k > 1.2` | Unlock bonus ambassador pool and extra campus kits while monitoring marginal CAC. | Flags scale threshold and proposes scale-up task for confirmation. |
-| Change | CAC INR 120–220 or Show-up 60%–75% | High reg starts with >25% checkout drop-off | Pivot ad copy to Artist Lineup; switch to 1-click WhatsApp RSVP. | Identifies funnel leak and drafts messaging/reminder task. |
-| Stop | CAC > INR 220 or Show-up < 60% | Vanity clicks without check-in; high no-show attrition | Pause spend immediately; reallocate remaining budget within 4h. | Triggers `THRESHOLD -> stop` alert and models reallocation. |
+| Scale | CAC < INR 120 and Actual Show-up > 80% | Clubs confirming bus contingents; referral `k > 1.2` | Unlock bonus ambassador pool and extra campus kits while monitoring marginal CAC. | Flags scale threshold and proposes scale-up task for confirmation. |
+| Change | CAC INR 120–220 or Actual Show-up 60%–80% | High reg starts with >25% checkout drop-off | Pivot ad copy to Artist Lineup; switch to 1-click WhatsApp RSVP. | Identifies funnel leak and drafts messaging/reminder task. |
+| Stop | CAC > INR 220 or Actual Show-up < 60% | Vanity clicks without check-in; high no-show attrition | Pause spend immediately; reallocate remaining budget within 4h. | Triggers `THRESHOLD -> stop` alert and models reallocation. |
 
 ---
 
