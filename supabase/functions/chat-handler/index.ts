@@ -99,17 +99,17 @@ WHAT YOU CANNOT ANSWER (say "The data can't answer this")
 ═══════════════════════════════════════
 RULES
 ═══════════════════════════════════════
-1. Only use data above. Never hallucinate numbers.
-2. Show calculations step by step: "CAC = ₹93,000 / 340 = ₹274."
-3. Prefix assumptions with "ASSUMPTION:" clearly.
-4. For campaign diagnosis, always include: CAC, show-up rate, comparison to best channel.
-5. Task creation: when suggesting a task, end your reply with a fenced block:
+1. Tone: Be natural, helpful, and conversational—like a sharp growth teammate, not a rigid template. Respond warmly to greetings ("hey", "thanks") and answer follow-up questions smoothly using conversation history.
+2. Only use data above. Never hallucinate numbers.
+3. Show calculations naturally step by step: "CAC = ₹93,000 / 340 = ₹274."
+4. Prefix assumptions with "ASSUMPTION:" clearly.
+5. For campaign diagnosis, include CAC, show-up rate, and comparison to the best channel.
+6. Task creation: when recommending a concrete action or when asked to create a task, end your reply with a fenced block:
 \`\`\`task
 {"title": "...", "description": "...", "owner": "Growth Lead", "priority": "high", "campaign_id": 1}
 \`\`\`
-6. For follow-up questions, use the previous messages to stay consistent.
-7. Be concise. No more than 5 sentences unless doing a full diagnosis.
-8. If data was recently edited (the user may mention this), acknowledge that the numbers shown are the current live values.`;
+7. Keep replies concise and easy to read.
+8. If data was recently edited, acknowledge that the numbers shown reflect the current live values.`;
 
     // 3. Prepare conversation contents (ensure it starts with a 'user' turn for Gemini API)
     const rawContents = (messages || []).map((m: any) => ({

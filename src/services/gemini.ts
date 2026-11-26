@@ -115,6 +115,14 @@ export const fallbackChatEngine = (
   const bestCacCampaign = sortedByCacAsc[0] || campaigns[0];
   const worstCacCampaign = sortedByCacAsc[sortedByCacAsc.length - 1] || campaigns[0];
 
+  // 0. Conversational greetings & acknowledgements
+  if (/^(hi|hey|hello|yo|hiya|good morning|good evening|thanks|thank you|cool|nice|got it)[\s!.]*$/i.test(query)) {
+    if (query.includes('thank') || query.includes('cool') || query.includes('nice') || query.includes('got it')) {
+      return `Anytime! Let me know if you want to explore another channel, test a budget shift, or add a task to the board.`;
+    }
+    return `Hey! I'm here to help you explore the RISA Festival growth data. You can ask me anything—like which channels are performing best, how to close the ${attendeeTargetObj.revised_goal - totalAttendees}-attendee gap, or how to navigate the dashboard.`;
+  }
+
   // 1. Unanswerable check (Strictly follows "The data can't answer this" prompt instruction)
   const unanswerableTriggers = [
     'why did attendee', 'why attendees chose', 'food', 'sponsor', 'sponsorship',
