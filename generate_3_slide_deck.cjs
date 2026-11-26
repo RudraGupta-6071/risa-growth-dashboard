@@ -90,13 +90,13 @@ async function buildThreeSlideDeck() {
       x: 0.75, y: 1.48, w: 2.1, h: 0.75,
       fontFace: FONT, fontSize: 40, bold: true, color: C.darkText, valign: 'middle'
     });
-    slide.addText('Admitted Attendees\n₹124.5 Blended CAC\n76.5% Show-Up Rate', {
+    slide.addText('Admitted Attendees\n₹124.5 CAC (₹2.74L ÷ 2,200)\n76.5%+ Paid Show-Up', {
       x: 2.75, y: 1.52, w: 1.8, h: 0.75,
-      fontFace: FONT, fontSize: 9, bold: true, color: C.darkText, valign: 'middle', lineSpacing: 13
+      fontFace: FONT, fontSize: 8.5, bold: true, color: C.darkText, valign: 'middle', lineSpacing: 13
     });
-    slide.addText('Achievable by shifting ₹28K from Paid Social to Ambassadors and Referrals', {
+    slide.addText('Achieved within existing ₹2.74L spend via ₹28K reallocation (₹0 extra budget)', {
       x: 0.78, y: 2.34, w: 3.75, h: 0.28,
-      fontFace: FONT, fontSize: 8, color: '3D231D'
+      fontFace: FONT, fontSize: 7.5, color: '3D231D'
     });
 
     // Two Sub-Scenario Cards (Base & Stretch)
@@ -173,13 +173,13 @@ async function buildThreeSlideDeck() {
       x: 4.92, y: 4.2, w: 4.53, h: 0.92,
       rectRadius: 0.14, fill: { color: '2B1412' }, line: { color: C.gold, width: 1 }
     });
-    slide.addText('23.8% PAID NO-SHOW LEAK & VENUE CAPACITY', {
+    slide.addText('23.8% PAID REG-TO-ADMISSION GAP & CAPACITY ASSUMPTION', {
       x: 5.08, y: 4.28, w: 4.2, h: 0.2,
-      fontFace: FONT, fontSize: 8, bold: true, color: C.gold
+      fontFace: FONT, fontSize: 7.5, bold: true, color: C.gold
     });
-    slide.addText('600 confirmed sign-ups never checked in (2,525 confirmed vs 1,925 paid admitted). Staggering entry across two waves (1,100 + 1,400) fits 2,200+ under our 2,500 cap.', {
+    slide.addText('600 confirmed sign-ups never checked in (2,525 confirmed vs 1,925 paid admitted). 2,500 is the total admission cap; two waves (1,100 + 1,400) keep simultaneous occupancy below cap.', {
       x: 5.08, y: 4.48, w: 4.22, h: 0.56,
-      fontFace: FONT, fontSize: 8, color: C.white, lineSpacing: 11.5
+      fontFace: FONT, fontSize: 7.5, color: C.white, lineSpacing: 11
     });
 
     addFooter(slide, 1);
@@ -217,14 +217,14 @@ async function buildThreeSlideDeck() {
         rationale: 'Countdown QR nudges to 730 dropouts in final 72h. 50/50 holdout; target 25% recovery.'
       },
       {
-        rank: '5', title: 'Metro QR Gate & Shuttles', gain: '+150', meta: '₹12.5K  |  ₹83 CAC',
-        rationale: '6 fast-track lanes + Purple Line shuttles eliminate queues. Track <5 min wait time.'
+        rank: '5', title: 'Metro QR Gate & Shuttles (Ops Conversion)', gain: '+150', meta: '₹12.5K  |  ₹83/recov',
+        rationale: 'Operational gate fix (not new regs): 6 QR lanes + Purple Line shuttles recover hesitant confirmers.'
       }
     ];
 
-    slide.addText('FIVE RANKED BETS (+1,475 GROSS → +450 NET DEDUPLICATED)', {
+    slide.addText('5 RANKED BETS (PLANNING ASSUMPTION: +1,475 GROSS − 1,025 OVERLAP/CAP = +450 NET)', {
       x: 0.55, y: 1.08, w: 5.6, h: 0.2,
-      fontFace: FONT, fontSize: 7.5, bold: true, color: C.rust
+      fontFace: FONT, fontSize: 6.8, bold: true, color: C.rust
     });
 
     bets.forEach((b, i) => {
@@ -305,14 +305,14 @@ async function buildThreeSlideDeck() {
       fontFace: FONT, fontSize: 8.5, bold: true, color: C.gold
     });
     slide.addText([
-      { text: 'Cut Paid Social 30% (-₹28K)\n', options: { fontSize: 9, bold: true, color: C.white } },
-      { text: '₹274 CAC and 240 no-shows (58.6% show-up).\n', options: { fontSize: 7.5, color: C.cream } },
-      { text: 'Freeze Creator Partners\n', options: { fontSize: 9, bold: true, color: C.white } },
-      { text: '₹337 CAC (₹59K spent for 175 attendees).\n', options: { fontSize: 7.5, color: C.cream } },
-      { text: 'Payoff: +190 attendees at ₹0 extra budget.', options: { fontSize: 8, bold: true, color: C.emerald } }
+      { text: 'Cut Paid Social 30% (-₹28K)\n', options: { fontSize: 8.5, bold: true, color: C.white } },
+      { text: '₹274 CAC, 240 no-shows (−102 attendees).\n', options: { fontSize: 7.2, color: C.cream } },
+      { text: 'Freeze Creator Partners (₹59K)\n', options: { fontSize: 8.5, bold: true, color: C.white } },
+      { text: '₹337 CAC (175 attendees).\n', options: { fontSize: 7.2, color: C.cream } },
+      { text: 'Math: ₹28K ÷ ₹96 avg CAC = +292 − 102 = +190 net (part of +450).', options: { fontSize: 7.2, bold: true, color: C.emerald } }
     ], {
-      x: 6.46, y: 3.88, w: 2.85, h: 1.18,
-      fontFace: FONT, valign: 'top', lineSpacing: 11
+      x: 6.46, y: 3.86, w: 2.85, h: 1.22,
+      fontFace: FONT, valign: 'top', lineSpacing: 10.5
     });
 
     addFooter(slide, 2, true);
@@ -334,7 +334,7 @@ async function buildThreeSlideDeck() {
       {
         tier: 'SCALE',
         heroRule: 'CAC < ₹120',
-        subRule: 'Show-Up Intent > 80%',
+        subRule: 'Actual Show-Up > 80%',
         color: C.emerald,
         cardBg: '17261A',
         signalTitle: 'EARLY SUCCESS SIGNALS',
@@ -344,8 +344,8 @@ async function buildThreeSlideDeck() {
       },
       {
         tier: 'CHANGE',
-        heroRule: 'CAC ₹125–₹190',
-        subRule: 'Show-Up Intent 65%–75%',
+        heroRule: 'CAC ₹120–₹220',
+        subRule: 'Actual Show-Up 60%–80%',
         color: C.gold,
         cardBg: '2B2111',
         signalTitle: 'EARLY WARNING SIGNALS',
@@ -356,11 +356,11 @@ async function buildThreeSlideDeck() {
       {
         tier: 'STOP',
         heroRule: 'CAC > ₹220',
-        subRule: 'Show-Up Intent < 60%',
+        subRule: 'Actual Show-Up < 60%',
         color: C.crimson,
         cardBg: '2E1414',
         signalTitle: 'EARLY FAILURE SIGNALS',
-        signalText: 'No-show rate > 30% of confirmed.\nZero creator promo code redemptions.\nNegative feedback on venue commute.',
+        signalText: 'No-show rate > 40% of confirmed.\nZero creator promo code redemptions.\nNegative feedback on venue commute.',
         actionTitle: 'TEAM RESPONSE',
         actionText: 'Pause campaign within 4 hours.\nShift remaining budget to Clubs & Referrals.'
       }
@@ -434,7 +434,7 @@ async function buildThreeSlideDeck() {
       fontFace: FONT, fontSize: 8, bold: true, align: 'right', color: C.gold,
       hyperlink: { url: 'https://rudragupta-6071.github.io/risa-growth-dashboard/' }
     });
-    slide.addText('Editing campaign spend updates blended CAC and target gaps instantly in Supabase. The embedded Gemini 2.5 Flash Copilot reads live campaigns, targets, tasks, and daily trends to diagnose leaks and create 1-click Task Board actions.', {
+    slide.addText('Editing campaign spend recalculates blended CAC and target gaps live in the dashboard (persisted via Supabase with local-storage fallback). The Gemini Copilot reads live state to diagnose leaks and propose confirmed Task Board actions.', {
       x: 0.72, y: 4.68, w: 8.55, h: 0.42,
       fontFace: FONT, fontSize: 8, color: C.white, lineSpacing: 11
     });
