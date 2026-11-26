@@ -20,6 +20,7 @@ interface ChatbotTabProps {
   targets: Target[];
   onTaskCreated: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onShowToast: (msg: string) => void;
+  isFloating?: boolean;
 }
 
 interface MessageItem {
@@ -34,7 +35,8 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
   campaigns,
   targets,
   onTaskCreated,
-  onShowToast
+  onShowToast,
+  isFloating = false
 }) => {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState('');
@@ -217,12 +219,20 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-14rem)] min-h-[550px] bg-[#2B1613] border border-[#3E201B] rounded-3xl overflow-hidden shadow-2xl">
+    <div
+      className={`flex flex-col bg-[#2B1613] overflow-hidden ${
+        isFloating
+          ? 'h-full w-full'
+          : 'h-[calc(100vh-14rem)] min-h-[550px] border border-[#3E201B] rounded-3xl shadow-2xl'
+      }`}
+    >
       {/* Disclaimer Header */}
-      <div className="p-4 bg-[#1C0E0C] border-b border-[#3E201B] flex items-center justify-between text-xs text-[#C4ABA1]">
-        <div className="flex items-center gap-2">
-          <HelpCircle className="w-4 h-4 text-[#F6C445]" />
-          <span>Answers strictly based on live 2025 festival data. Unanswerable questions are flagged.</span>
+      <div className="p-3.5 bg-[#1C0E0C] border-b border-[#3E201B] flex items-center justify-between text-xs text-[#C4ABA1]">
+        <div className="flex items-center gap-2 min-w-0">
+          <HelpCircle className="w-4 h-4 text-[#F6C445] shrink-0" />
+          <span className="truncate">
+            {isFloating ? 'Live 2025 festival data' : 'Answers strictly based on live 2025 festival data. Unanswerable questions are flagged.'}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="hidden sm:inline text-[11px] text-[#34D399] font-black uppercase">● Gemini 2.5 Thinking</span>

@@ -4,6 +4,7 @@ import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
 import { ResetConfirmModal } from './components/ResetConfirmModal';
 import { SettingsModal } from './components/SettingsModal';
+import { FloatingCopilot } from './components/FloatingCopilot';
 import { DashboardTab } from './tabs/DashboardTab';
 import { DiagnosisTab } from './tabs/DiagnosisTab';
 import { TasksTab } from './tabs/TasksTab';
@@ -258,6 +259,15 @@ export const App: React.FC = () => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onConfigChanged={loadData}
+      />
+
+      {/* Expandable Floating AI Copilot across all tabs */}
+      <FloatingCopilot
+        campaigns={campaigns}
+        targets={targets}
+        onTaskCreated={handleCreateTask}
+        onShowToast={msg => setToastMessage(msg)}
+        hidden={activeTab === 'chatbot'}
       />
 
       {/* Toast Notification */}
