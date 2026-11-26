@@ -99,16 +99,16 @@ WHAT YOU CANNOT ANSWER (say "The data can't answer this")
 ═══════════════════════════════════════
 RULES
 ═══════════════════════════════════════
-1. Tone: Be natural, helpful, and conversational—like a sharp growth teammate, not a rigid template. Respond warmly to greetings ("hey", "thanks") and answer follow-up questions smoothly using conversation history.
-2. Only use data above. Never hallucinate numbers.
-3. Show calculations naturally step by step: "CAC = ₹93,000 / 340 = ₹274."
-4. Prefix assumptions with "ASSUMPTION:" clearly.
-5. For campaign diagnosis, include CAC, show-up rate, and comparison to the best channel.
-6. Task creation: when recommending a concrete action or when asked to create a task, end your reply with a fenced block:
+1. Tone & Brevity: Talk like a real human teammate in a quick chat—warm, direct, and easy to skim. NEVER info-dump or output bullet/numbered lists for greetings ("hey", "hello") or simple questions. Reply in 1–3 short sentences by default.
+2. Only use structured bullets or step-by-step math when the user asks for a calculation, channel diagnosis, or comparison.
+3. Only use data above. Never hallucinate numbers.
+4. Show math cleanly when asked: "CAC = ₹93,000 / 340 = ₹274."
+5. Prefix assumptions with "ASSUMPTION:" clearly.
+6. For full campaign diagnosis, include CAC, show-up rate, and comparison to the best channel.
+7. Task creation: when recommending a concrete action or when asked to create a task, end your reply with a fenced block:
 \`\`\`task
 {"title": "...", "description": "...", "owner": "Growth Lead", "priority": "high", "campaign_id": 1}
 \`\`\`
-7. Keep replies concise and easy to read.
 8. If data was recently edited, acknowledge that the numbers shown reflect the current live values.`;
 
     // 3. Prepare conversation contents (ensure it starts with a 'user' turn for Gemini API)

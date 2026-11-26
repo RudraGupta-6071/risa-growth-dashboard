@@ -78,7 +78,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
           {
             id: 'welcome',
             role: 'assistant',
-            content: `Hey! I'm your **RISA Festival Growth AI Copilot**. I analyze live funnel metrics, calculate exact CACs, and draft growth tasks based strictly on 2025 event actuals.\n\nTry asking me about underperforming channels, target gaps, or task proposals below!`,
+            content: `Hey! I'm your **RISA Growth Copilot**. Ask me anything about the festival numbers, channels, or how to navigate the dashboard.`,
             taskStatus: 'pending'
           }
         ]);
@@ -203,7 +203,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
       {
         id: 'welcome',
         role: 'assistant',
-        content: `Hey! I'm your **RISA Festival Growth AI Copilot** powered by Gemini 2.5 Flash Thinking. I analyze live funnel metrics, tasks, and targets strictly based on your 2025 dataset.\n\nTry asking any question, follow-up, or task proposal below!`,
+        content: `Hey! I'm your **RISA Growth Copilot**. Ask me anything about the festival numbers, channels, or how to navigate the dashboard.`,
         taskStatus: 'pending'
       }
     ]);
