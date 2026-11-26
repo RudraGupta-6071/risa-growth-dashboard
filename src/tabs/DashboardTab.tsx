@@ -190,7 +190,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="flex items-center gap-2 text-xs font-black tracking-wider text-[#FFFFFF] uppercase">
             <span>PRE-EVENT FUNNEL TRAJECTORY</span>
             <ChevronRight className="w-4 h-4 text-[#F6C445]" />
-            <span className="text-[#C4ABA1]">CUMULATIVE SIGN-UPS VS EVENT-DAY CHECK-INS</span>
+            <span className="text-[#C4ABA1]">CUMULATIVE SIGN-UPS VS EVENT DAY (20 APR 2025)</span>
           </div>
           <div className="flex items-center gap-4 text-[11px] font-bold">
             <span className="flex items-center gap-1.5 text-[#FFFFFF]">

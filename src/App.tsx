@@ -180,9 +180,12 @@ export const App: React.FC = () => {
           </div>
 
           {/* Breadcrumbs with rounded badge */}
-          <div className="flex items-center gap-2 mt-4 text-[11px] font-extrabold uppercase tracking-wider text-[#FFFFFF]">
+          <div className="flex flex-wrap items-center gap-2 mt-4 text-[11px] font-extrabold uppercase tracking-wider text-[#FFFFFF]">
             <span className="px-2.5 py-1 bg-[#281613] text-[#F6C445] rounded-full border border-[#3E201B]">
               RISA FESTIVAL 2025
+            </span>
+            <span className="px-2.5 py-1 bg-[#34D399]/15 text-[#34D399] rounded-full border border-[#34D399]/30">
+              EVENT DAY: 20 APR 2025
             </span>
             <ChevronRight className="w-3.5 h-3.5 text-[#F6C445]" />
             <span className="text-[#C4ABA1]">
