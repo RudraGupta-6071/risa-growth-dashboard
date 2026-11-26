@@ -1,5 +1,6 @@
 import React from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Database, HardDrive } from 'lucide-react';
+import { StorageStatus } from '../services/supabase';
 
 export type TabType = 'dashboard' | 'diagnosis' | 'tasks' | 'chatbot';
 
@@ -10,14 +11,17 @@ interface SidebarProps {
   onOpenResetModal: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+  storageStatus?: StorageStatus;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
+  onOpenSettings,
   onOpenResetModal,
   isMobileOpen,
-  setIsMobileOpen
+  setIsMobileOpen,
+  storageStatus = { mode: 'local', lastError: null }
 }) => {
 
   const navItems: { id: TabType; label: string }[] = [
@@ -95,14 +99,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom Connection Status Strip */}
-        <div className="p-3 bg-[#1C0E0C] border border-[#381B16] rounded-2xl flex items-center justify-center text-xs">
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          title={
+            storageStatus.mode === 'supabase'
+              ? 'Data is persisted to Supabase Cloud. Click to configure settings.'
+              : `Running in Local Storage fallback${storageStatus.lastError ? `: ${storageStatus.lastError}` : ''}. Click to configure Supabase.`
+          }
+          className="w-full p-3 bg-[#1C0E0C] hover:bg-[#281613] border border-[#381B16] rounded-2xl flex items-center justify-center text-xs transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#34D399] animate-pulse" />
-            <span className="text-[11px] font-bold text-[#FFFFFF] tracking-wider">
-              GROWTH ENGINE LIVE
-            </span>
+            {storageStatus.mode === 'supabase' ? (
+              <>
+                <div className="w-2.5 h-2.5 rounded-full bg-[#34D399] animate-pulse shrink-0" />
+                <Database className="w-3.5 h-3.5 text-[#34D399] shrink-0" />
+                <span className="text-[11px] font-bold text-[#FFFFFF] tracking-wider">
+                  SAVED TO SUPABASE
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="w-2.5 h-2.5 rounded-full bg-[#F6C445] shrink-0" />
+                <HardDrive className="w-3.5 h-3.5 text-[#F6C445] shrink-0" />
+                <span className="text-[11px] font-bold text-[#F6C445] tracking-wider">
+                  LOCAL STORAGE MODE
+                </span>
+              </>
+            )}
           </div>
-        </div>
+        </button>
       </aside>
     </>
   );

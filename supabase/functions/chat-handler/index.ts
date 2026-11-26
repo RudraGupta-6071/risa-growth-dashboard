@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, session_id } = await req.json();
+    const { messages, session_id, campaigns: clientCampaigns, targets: clientTargets } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -31,8 +31,8 @@ serve(async (req) => {
 
     // 1. Fetch live campaigns, targets, tasks, and daily metrics
     const [
-      { data: campaigns },
-      { data: targets },
+      { data: dbCampaigns },
+      { data: dbTargets },
       { data: tasks },
       { data: dailyMetrics }
     ] = await Promise.all([
@@ -42,10 +42,35 @@ serve(async (req) => {
       supabase.from('daily_metrics').select('*').order('metric_date', { ascending: true })
     ]);
 
-    // 2. Build system prompt with live injected data
+    const campaigns = (Array.isArray(clientCampaigns) && clientCampaigns.length > 0) ? clientCampaigns : (dbCampaigns || []);
+    const targets = (Array.isArray(clientTargets) && clientTargets.length > 0) ? clientTargets : (dbTargets || []);
+
+    const totalSpend = campaigns.reduce((s: number, c: any) => s + Number(c.spend_inr || 0), 0);
+    const totalAttendees = campaigns.reduce((s: number, c: any) => s + Number(c.attendees || 0), 0);
+    const totalConfirmed = campaigns.reduce((s: number, c: any) => s + Number(c.confirmed || 0), 0);
+    const blendedCac = totalAttendees > 0 ? Math.round(totalSpend / totalAttendees) : 0;
+    const paidRankings = campaigns
+      .filter((c: any) => Number(c.spend_inr) > 0 && Number(c.attendees) > 0)
+      .map((c: any) => ({
+        name: c.name,
+        cac_inr: Math.round(Number(c.spend_inr) / Number(c.attendees)),
+        showup_rate_pct: Number(c.confirmed) > 0 ? Number(((Number(c.attendees) / Number(c.confirmed)) * 100).toFixed(2)) : 0,
+      }))
+      .sort((a: any, b: any) => a.cac_inr - b.cac_inr);
+
+    const attendeeTarget = targets.find((t: any) => t.metric === 'attendees') || { base_value: 2050, stretch_value: 2500, revised_goal: 2200 };
+    const budgetTarget = targets.find((t: any) => t.metric === 'budget_inr') || { base_value: 274000, stretch_value: 300000, revised_goal: 300000 };
+    const stretchCac = attendeeTarget.stretch_value > 0 ? Math.round(budgetTarget.stretch_value / attendeeTarget.stretch_value) : 120;
+
+    // 2. Build system prompt with live injected data + deterministic calculations
     const systemPrompt = `You are the RISA Festival Growth AI Copilot, embedded inside a live growth dashboard.
 
-Your job: help the growth team diagnose campaign performance, calculate metrics, recommend actions, and manage tasks — using only the data injected below.
+Your job: help the growth team diagnose campaign performance, calculate metrics, recommend actions, and manage tasks — using only the data and pre-computed calculations injected below.
+
+═══════════════════════════════════════
+DETERMINISTIC SUMMARY (pre-computed)
+═══════════════════════════════════════
+${JSON.stringify({ totalSpend, totalAttendees, totalConfirmed, blendedCac, stretchCac, remainingBudget: Math.max(0, budgetTarget.revised_goal - totalSpend), attendeeGap: attendeeTarget.revised_goal - totalAttendees, paidRankings }, null, 2)}
 
 ═══════════════════════════════════════
 LIVE DATA (injected at query time)

@@ -12,6 +12,31 @@ const STORAGE_KEY_CHAT = 'risa_chat_logs_v1';
 const DEFAULT_SUPABASE_URL = 'https://kuqntcxcvallojirzndx.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_hE8jDhcfD-MKLbwSG1akQQ_0cUZvyha';
 
+export type StorageMode = 'supabase' | 'local';
+
+export interface StorageStatus {
+  mode: StorageMode;
+  lastError: string | null;
+}
+
+let currentStorageStatus: StorageStatus = { mode: 'local', lastError: null };
+const statusListeners = new Set<(status: StorageStatus) => void>();
+
+const setStorageStatus = (mode: StorageMode, lastError: string | null = null) => {
+  currentStorageStatus = { mode, lastError };
+  statusListeners.forEach(fn => fn(currentStorageStatus));
+};
+
+export const getStorageStatus = (): StorageStatus => currentStorageStatus;
+
+export const subscribeStorageStatus = (fn: (status: StorageStatus) => void): (() => void) => {
+  statusListeners.add(fn);
+  fn(currentStorageStatus);
+  return () => {
+    statusListeners.delete(fn);
+  };
+};
+
 export const getStoredConfig = () => {
   const url = localStorage.getItem('VITE_SUPABASE_URL') || import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
   const anonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
@@ -73,13 +98,36 @@ const setLocal = <T>(key: string, val: T): void => {
 };
 
 const recomputeCampaignDerived = (c: Campaign): Campaign => {
-  const cac = c.attendees > 0 ? Math.round(c.spend_inr / c.attendees) : 0;
-  const showup = c.confirmed > 0 ? Number(((c.attendees / c.confirmed) * 100).toFixed(2)) : 0;
+  const spend = Math.max(0, Math.round(Number(c.spend_inr) || 0));
+  const attendees = Math.max(0, Math.round(Number(c.attendees) || 0));
+  const cac = attendees > 0 ? Math.round(spend / attendees) : 0;
+  const showup = c.confirmed > 0 ? Number(((attendees / c.confirmed) * 100).toFixed(2)) : 0;
+  const noShows = c.channel_type === 'walk_in' ? 0 : Math.max(0, c.confirmed - attendees);
   return {
     ...c,
+    spend_inr: spend,
+    attendees,
+    noshow_count: noShows,
     cac_inr: cac,
     showup_rate: showup,
   };
+};
+
+const sanitizeCampaignUpdates = (updates: Partial<Campaign>): Partial<Campaign> => {
+  const sanitized: Partial<Campaign> = {};
+  if (updates.spend_inr !== undefined) {
+    sanitized.spend_inr = Math.max(0, Math.round(Number(updates.spend_inr) || 0));
+  }
+  if (updates.attendees !== undefined) {
+    sanitized.attendees = Math.max(0, Math.round(Number(updates.attendees) || 0));
+  }
+  if (updates.status !== undefined && ['active', 'paused', 'stopped'].includes(updates.status)) {
+    sanitized.status = updates.status;
+  }
+  if (updates.recommendation !== undefined && ['scale', 'change', 'stop'].includes(updates.recommendation)) {
+    sanitized.recommendation = updates.recommendation;
+  }
+  return sanitized;
 };
 
 export const api = {
@@ -87,15 +135,19 @@ export const api = {
   async testSupabaseConnection(): Promise<{ success: boolean; message: string; rows?: number }> {
     const client = getSupabaseClient();
     if (!client) {
+      setStorageStatus('local', 'No Supabase credentials configured');
       return { success: false, message: 'No Supabase credentials configured (running in local storage mode).' };
     }
     try {
       const { data, error } = await client.from('campaigns').select('id', { count: 'exact' });
       if (error) {
+        setStorageStatus('local', error.message);
         return { success: false, message: `Supabase error: ${error.message}` };
       }
+      setStorageStatus('supabase', null);
       return { success: true, message: `Connected to Supabase! Found ${data?.length ?? 0} campaign rows.`, rows: data?.length };
     } catch (err: any) {
+      setStorageStatus('local', err.message || 'Network connection failed');
       return { success: false, message: err.message || 'Network connection failed' };
     }
   },
@@ -110,61 +162,87 @@ export const api = {
           .select('*')
           .order('id', { ascending: true });
         if (!error && data && data.length > 0) {
-          return data.map((c: any) => ({
-            ...c,
-            cac_inr: c.cac_inr ?? (c.attendees > 0 ? Math.round(c.spend_inr / c.attendees) : 0),
-            showup_rate: c.showup_rate ?? (c.confirmed > 0 ? Number(((c.attendees / c.confirmed) * 100).toFixed(2)) : 0),
-          }));
+          const mapped = data.map((c: any) => recomputeCampaignDerived(c));
+          setLocal(STORAGE_KEY_CAMPAIGNS, mapped);
+          setStorageStatus('supabase', null);
+          return mapped;
         }
-      } catch (err) {
+        if (error) {
+          setStorageStatus('local', error.message);
+        }
+      } catch (err: any) {
         console.warn('Falling back to local campaigns storage:', err);
+        setStorageStatus('local', err?.message || 'Supabase unreachable');
       }
+    } else {
+      setStorageStatus('local', null);
     }
     const local = getLocal<Campaign[]>(STORAGE_KEY_CAMPAIGNS, INITIAL_CAMPAIGNS);
     return local.map(recomputeCampaignDerived);
   },
 
-  async updateCampaign(id: number, updates: Partial<Campaign>): Promise<Campaign[]> {
+  async updateCampaign(id: number, updates: Partial<Campaign>): Promise<{ campaigns: Campaign[]; persistedTo: StorageMode }> {
+    const safeUpdates = sanitizeCampaignUpdates(updates);
     const client = getSupabaseClient();
     if (client) {
       try {
-        const payload: any = { ...updates, updated_at: new Date().toISOString() };
-        delete payload.cac_inr; // Generated in postgres
-        delete payload.showup_rate;
+        const payload: any = { ...safeUpdates, updated_at: new Date().toISOString() };
         const { error } = await client.from('campaigns').update(payload).eq('id', id);
         if (!error) {
-          return this.getCampaigns();
+          const refreshed = await this.getCampaigns();
+          setStorageStatus('supabase', null);
+          return { campaigns: refreshed, persistedTo: 'supabase' };
         }
-      } catch (err) {
+        setStorageStatus('local', error.message);
+      } catch (err: any) {
         console.warn('Supabase update failed, updating local:', err);
+        setStorageStatus('local', err?.message || 'Supabase update failed');
       }
+    } else {
+      setStorageStatus('local', null);
     }
     const local = getLocal<Campaign[]>(STORAGE_KEY_CAMPAIGNS, INITIAL_CAMPAIGNS);
-    const updated = local.map(c => (c.id === id ? recomputeCampaignDerived({ ...c, ...updates }) : c));
+    const updated = local.map(c => (c.id === id ? recomputeCampaignDerived({ ...c, ...safeUpdates }) : c));
     setLocal(STORAGE_KEY_CAMPAIGNS, updated);
-    return updated;
+    return { campaigns: updated, persistedTo: 'local' };
   },
 
-  async resetCampaigns(): Promise<Campaign[]> {
+  async resetCampaigns(): Promise<{ campaigns: Campaign[]; persistedTo: StorageMode }> {
     const client = getSupabaseClient();
+    const resetLocal = INITIAL_CAMPAIGNS.map(recomputeCampaignDerived);
+    setLocal(STORAGE_KEY_CAMPAIGNS, resetLocal);
+
     if (client) {
       try {
-        const current = await this.getCampaigns();
-        for (const c of current) {
-          await client.from('campaigns').update({
-            spend_inr: c.spend_original,
-            attendees: c.attendees_original,
-            updated_at: new Date().toISOString()
-          }).eq('id', c.id);
+        const results = await Promise.all(
+          INITIAL_CAMPAIGNS.map(initial =>
+            client
+              .from('campaigns')
+              .update({
+                spend_inr: initial.spend_original,
+                attendees: initial.attendees_original,
+                status: initial.status,
+                recommendation: initial.recommendation,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', initial.id)
+          )
+        );
+        const firstErr = results.find(r => r.error)?.error;
+        if (!firstErr) {
+          const refreshed = await this.getCampaigns();
+          setStorageStatus('supabase', null);
+          return { campaigns: refreshed, persistedTo: 'supabase' };
         }
-        return this.getCampaigns();
-      } catch (err) {
+        setStorageStatus('local', firstErr.message);
+      } catch (err: any) {
         console.warn('Supabase reset failed, resetting local:', err);
+        setStorageStatus('local', err?.message || 'Supabase reset failed');
       }
+    } else {
+      setStorageStatus('local', null);
     }
-    const reset = INITIAL_CAMPAIGNS.map(recomputeCampaignDerived);
-    setLocal(STORAGE_KEY_CAMPAIGNS, reset);
-    return reset;
+    return { campaigns: resetLocal, persistedTo: 'local' };
   },
 
   // Targets
@@ -173,7 +251,11 @@ export const api = {
     if (client) {
       try {
         const { data, error } = await client.from('targets').select('*').order('id', { ascending: true });
-        if (!error && data && data.length > 0) return data;
+        if (!error && data && data.length > 0) {
+          setLocal(STORAGE_KEY_TARGETS, data);
+          setStorageStatus('supabase', null);
+          return data;
+        }
       } catch (err) {
         console.warn('Targets query error:', err);
       }
@@ -181,45 +263,64 @@ export const api = {
     return getLocal<Target[]>(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
   },
 
-  async updateTarget(metric: string, revised_goal: number): Promise<Target[]> {
+  async updateTarget(metric: string, revised_goal: number): Promise<{ targets: Target[]; persistedTo: StorageMode }> {
+    const safeGoal = Math.max(1, Math.round(Number(revised_goal) || 1));
     const client = getSupabaseClient();
     if (client) {
       try {
-        const { error } = await client.from('targets').update({ revised_goal }).eq('metric', metric);
-        if (!error) return this.getTargets();
-      } catch (err) {
+        const { error } = await client.from('targets').update({ revised_goal: safeGoal }).eq('metric', metric);
+        if (!error) {
+          const refreshed = await this.getTargets();
+          setStorageStatus('supabase', null);
+          return { targets: refreshed, persistedTo: 'supabase' };
+        }
+        setStorageStatus('local', error.message);
+      } catch (err: any) {
         console.warn('Supabase target update failed, updating local:', err);
+        setStorageStatus('local', err?.message || 'Target update failed');
       }
     }
     const local = getLocal<Target[]>(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
-    const updated = local.map(t => (t.metric === metric ? { ...t, revised_goal } : t));
+    const updated = local.map(t => (t.metric === metric ? { ...t, revised_goal: safeGoal } : t));
     setLocal(STORAGE_KEY_TARGETS, updated);
-    return updated;
+    return { targets: updated, persistedTo: 'local' };
   },
 
-  async resetTargets(): Promise<Target[]> {
+  async resetTargets(): Promise<{ targets: Target[]; persistedTo: StorageMode }> {
+    setLocal(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
     const client = getSupabaseClient();
     if (client) {
       try {
-        for (const t of INITIAL_TARGETS) {
-          await client.from('targets').update({ revised_goal: t.revised_goal }).eq('metric', t.metric);
+        const results = await Promise.all(
+          INITIAL_TARGETS.map(t =>
+            client.from('targets').update({ revised_goal: t.revised_goal }).eq('metric', t.metric)
+          )
+        );
+        const firstErr = results.find(r => r.error)?.error;
+        if (!firstErr) {
+          const refreshed = await this.getTargets();
+          setStorageStatus('supabase', null);
+          return { targets: refreshed, persistedTo: 'supabase' };
         }
-        return this.getTargets();
-      } catch (err) {
+        setStorageStatus('local', firstErr.message);
+      } catch (err: any) {
         console.warn('Supabase targets reset failed, resetting local:', err);
+        setStorageStatus('local', err?.message || 'Targets reset failed');
       }
     }
-    setLocal(STORAGE_KEY_TARGETS, INITIAL_TARGETS);
-    return INITIAL_TARGETS;
+    return { targets: INITIAL_TARGETS, persistedTo: 'local' };
   },
 
-  // Daily Metrics
+  // Daily Metrics (Read-only historical records)
   async getDailyMetrics(): Promise<DailyMetric[]> {
     const client = getSupabaseClient();
     if (client) {
       try {
         const { data, error } = await client.from('daily_metrics').select('*').order('metric_date', { ascending: true });
-        if (!error && data && data.length > 0) return data;
+        if (!error && data && data.length > 0) {
+          setLocal(STORAGE_KEY_DAILY, data);
+          return data;
+        }
       } catch (err) {
         console.warn('Daily metrics query error:', err);
       }
@@ -237,10 +338,13 @@ export const api = {
           .select('*, campaigns(name)')
           .order('id', { ascending: false });
         if (!error && data) {
-          return data.map((t: any) => ({
+          const mapped = data.map((t: any) => ({
             ...t,
             campaign_name: t.campaigns?.name || (t.campaign_id ? `Campaign #${t.campaign_id}` : undefined)
           }));
+          setLocal(STORAGE_KEY_TASKS, mapped);
+          setStorageStatus('supabase', null);
+          return mapped;
         }
       } catch (err) {
         console.warn('Tasks query error:', err);
@@ -257,14 +361,17 @@ export const api = {
     });
   },
 
-  async createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
+  async createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<{ task: Task; persistedTo: StorageMode }> {
+    const title = (task.title || '').trim();
+    if (!title) throw new Error('Task title is required');
+
     const client = getSupabaseClient();
     if (client) {
       try {
         const { data, error } = await client
           .from('tasks')
           .insert([{
-            title: task.title,
+            title,
             description: task.description || null,
             campaign_id: task.campaign_id || null,
             owner: task.owner || null,
@@ -276,63 +383,79 @@ export const api = {
           .select('*, campaigns(name)')
           .single();
         if (!error && data) {
-          return {
+          const created: Task = {
             ...data,
             campaign_name: data.campaigns?.name
           };
+          setStorageStatus('supabase', null);
+          return { task: created, persistedTo: 'supabase' };
         }
-      } catch (err) {
+        if (error) setStorageStatus('local', error.message);
+      } catch (err: any) {
         console.warn('Supabase task insert failed, saving locally:', err);
+        setStorageStatus('local', err?.message || 'Task insert failed');
       }
     }
     const local = getLocal<Task[]>(STORAGE_KEY_TASKS, INITIAL_TASKS);
     const newId = local.length > 0 ? Math.max(...local.map(t => t.id)) + 1 : 1;
     const newTask: Task = {
       ...task,
+      title,
       id: newId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
     setLocal(STORAGE_KEY_TASKS, [newTask, ...local]);
-    return newTask;
+    return { task: newTask, persistedTo: 'local' };
   },
 
-  async updateTask(id: number, updates: Partial<Task>): Promise<Task[]> {
+  async updateTask(id: number, updates: Partial<Task>): Promise<{ tasks: Task[]; persistedTo: StorageMode }> {
     const client = getSupabaseClient();
     if (client) {
       try {
+        const payload: any = { ...updates, updated_at: new Date().toISOString() };
+        delete payload.campaign_name;
         const { error } = await client
           .from('tasks')
-          .update({
-            ...updates,
-            updated_at: new Date().toISOString()
-          })
+          .update(payload)
           .eq('id', id);
-        if (!error) return this.getTasks();
-      } catch (err) {
+        if (!error) {
+          const refreshed = await this.getTasks();
+          setStorageStatus('supabase', null);
+          return { tasks: refreshed, persistedTo: 'supabase' };
+        }
+        setStorageStatus('local', error.message);
+      } catch (err: any) {
         console.warn('Supabase task update failed:', err);
+        setStorageStatus('local', err?.message || 'Task update failed');
       }
     }
     const local = getLocal<Task[]>(STORAGE_KEY_TASKS, INITIAL_TASKS);
     const updated = local.map(t => (t.id === id ? { ...t, ...updates, updated_at: new Date().toISOString() } : t));
     setLocal(STORAGE_KEY_TASKS, updated);
-    return updated;
+    return { tasks: updated, persistedTo: 'local' };
   },
 
-  async deleteTask(id: number): Promise<Task[]> {
+  async deleteTask(id: number): Promise<{ tasks: Task[]; persistedTo: StorageMode }> {
     const client = getSupabaseClient();
     if (client) {
       try {
         const { error } = await client.from('tasks').delete().eq('id', id);
-        if (!error) return this.getTasks();
-      } catch (err) {
+        if (!error) {
+          const refreshed = await this.getTasks();
+          setStorageStatus('supabase', null);
+          return { tasks: refreshed, persistedTo: 'supabase' };
+        }
+        setStorageStatus('local', error.message);
+      } catch (err: any) {
         console.warn('Supabase task delete failed:', err);
+        setStorageStatus('local', err?.message || 'Task delete failed');
       }
     }
     const local = getLocal<Task[]>(STORAGE_KEY_TASKS, INITIAL_TASKS);
     const filtered = local.filter(t => t.id !== id);
     setLocal(STORAGE_KEY_TASKS, filtered);
-    return filtered;
+    return { tasks: filtered, persistedTo: 'local' };
   },
 
   // Chat Logs

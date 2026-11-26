@@ -17,6 +17,7 @@ import {
   CartesianGrid
 } from 'recharts';
 import { Campaign, Target, DailyMetric } from '../types';
+import { computeDashboardAnalytics } from '../services/analytics';
 
 interface DashboardTabProps {
   campaigns: Campaign[];
@@ -87,52 +88,32 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     );
   }
 
-  // 1. Calculations
-  const totalAttendees = campaigns.reduce((acc, c) => acc + c.attendees, 0);
-  const totalRegistrations = campaigns.reduce((acc, c) => acc + c.registrations, 0);
-  const totalConfirmed = campaigns.reduce((acc, c) => acc + c.confirmed, 0);
-  const totalSpend = campaigns.reduce((acc, c) => acc + c.spend_inr, 0);
+  // 1. Deterministic Calculations (Single Source of Truth)
+  const analytics = computeDashboardAnalytics(campaigns, targets, dailyMetrics);
+  const {
+    totalAttendees,
+    totalRegistrations,
+    totalConfirmed,
+    totalSpend,
+    attendeesTarget,
+    registrationsTarget,
+    budgetTarget,
+    blendedCac,
+    avgShowupRate,
+    stretchCac,
+    funnelStages,
+    forecast,
+    reconciliation,
+    strategyReconciliation,
+    remainingBudget: remainingSpend,
+    budgetUtilizationPct,
+  } = analytics;
 
-  const attendeesTarget = targets.find(t => t.metric === 'attendees') || {
-    base_value: 2050,
-    stretch_value: 2500,
-    revised_goal: 2200
-  };
-  const registrationsTarget = targets.find(t => t.metric === 'registrations') || {
-    base_value: 2800,
-    stretch_value: 3067,
-    revised_goal: 3200
-  };
-  const budgetTarget = targets.find(t => t.metric === 'budget_inr') || {
-    base_value: 274000,
-    stretch_value: 300000,
-    revised_goal: 300000
-  };
-
-  const blendedCac = totalAttendees > 0 ? Math.round(totalSpend / totalAttendees) : 0;
-
-  const nonWalkInCampaigns = campaigns.filter(c => c.channel_type !== 'walk_in');
-  const nonWalkInAttendees = nonWalkInCampaigns.reduce((sum, c) => sum + c.attendees, 0);
-  const nonWalkInConfirmed = nonWalkInCampaigns.reduce((sum, c) => sum + c.confirmed, 0);
-  const avgShowupRate = nonWalkInConfirmed > 0 ? Number(((nonWalkInAttendees / nonWalkInConfirmed) * 100).toFixed(1)) : 0;
-
-  const budgetUsedPct = budgetTarget.revised_goal > 0 ? totalSpend / budgetTarget.revised_goal : 0.91;
-  const stretchDelta = (attendeesTarget.stretch_value || 2500) - (attendeesTarget.base_value || 2050);
-  const projectedAttendees = Math.round(totalAttendees + stretchDelta * (1 - budgetUsedPct * 0.3));
-
-  // Funnel Data
-  const funnelData = [
-    { stage: 'Identified', actual: 2050 },
-    { stage: 'Registrations', actual: totalRegistrations },
-    { stage: 'Confirmed', actual: totalConfirmed },
-    { stage: 'Admitted', actual: totalAttendees },
-    { stage: 'Revised Goal', actual: attendeesTarget.revised_goal },
-  ];
-
-  // Budget calculations
-  const budgetMax = 300000;
-  const spendPct = Math.min(100, Math.round((totalSpend / budgetMax) * 100));
-  const remainingSpend = Math.max(0, budgetMax - totalSpend);
+  const projectedAttendees = forecast.projectedAttendees;
+  const budgetMax = budgetTarget.revised_goal || 300000;
+  const spendPct = Math.min(100, budgetUtilizationPct);
+  const regToAdmittedPct =
+    totalRegistrations > 0 ? ((totalAttendees / totalRegistrations) * 100).toFixed(1) : '0.0';
 
   return (
     <div className="space-y-8">
@@ -142,7 +123,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="bg-[#2B1613] border border-[#3E201B] p-7 rounded-3xl flex flex-col justify-between items-center text-center shadow-xl hover:border-[#F6C445]/40 transition-all">
           <div>
             <span className="text-[11px] font-bold text-[#C4ABA1] tracking-widest uppercase">
-              ATTENDEE METRIC
+              ATTENDEE METRIC • ACTUAL
             </span>
             <div className="text-[10px] text-[#F6C445] font-black tracking-wider uppercase mt-1">
               TOTAL VERIFIED ADMITTED
@@ -160,7 +141,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="bg-[#F6C445] border border-[#F6C445] p-7 rounded-3xl flex flex-col justify-between items-center text-center shadow-2xl scale-[1.02]">
           <div>
             <span className="text-[11px] font-black text-[#140A09]/75 tracking-widest uppercase">
-              UNIT ECONOMICS
+              UNIT ECONOMICS • ACTUAL
             </span>
             <div className="text-[10px] text-[#140A09] font-black tracking-wider uppercase mt-1">
               BLENDED CAC (SPEND ÷ ATTENDEES)
@@ -170,7 +151,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             ₹{blendedCac}
           </div>
           <button className="px-6 py-2 bg-[#140A09] text-[#F6C445] font-black text-[11px] tracking-wider uppercase rounded-full shadow hover:bg-[#281512] transition-colors">
-            OPTIMAL &lt; ₹150
+            STRETCH CAC: ₹{stretchCac}
           </button>
         </div>
 
@@ -178,7 +159,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="bg-[#2B1613] border border-[#3E201B] p-7 rounded-3xl flex flex-col justify-between items-center text-center shadow-xl hover:border-[#F6C445]/40 transition-all">
           <div>
             <span className="text-[11px] font-bold text-[#C4ABA1] tracking-widest uppercase">
-              BUDGET UTILIZATION
+              BUDGET UTILIZATION • ACTUAL
             </span>
             <div className="text-[10px] text-[#F6C445] font-black tracking-wider uppercase mt-1">
               CUMULATIVE CAMPAIGN SPEND
@@ -188,7 +169,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             ₹{(totalSpend / 100000).toFixed(2)}L
           </div>
           <button className="px-6 py-2 bg-[#F6C445] text-[#140A09] font-black text-[11px] tracking-wider uppercase rounded-full shadow hover:bg-[#FDE047] transition-colors">
-            MAX: ₹3.00L
+            MAX: ₹{(budgetMax / 100000).toFixed(2)}L
           </button>
         </div>
       </div>
@@ -196,19 +177,33 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       {/* Secondary Metrics Bar (Rounded-2xl pills) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#1C0E0C] border border-[#381B16] px-5 py-3.5 rounded-2xl flex items-center justify-between">
-          <span className="text-xs font-bold text-[#C4ABA1] uppercase">Registrations</span>
+          <div>
+            <span className="text-xs font-bold text-[#C4ABA1] uppercase block">Registrations</span>
+            <span className="text-[9px] font-black text-[#34D399] uppercase tracking-wider">ACTUAL (CAMPAIGNS)</span>
+          </div>
           <span className="text-sm font-black text-[#FFFFFF]">
             {totalRegistrations.toLocaleString('en-IN')}{' '}
-            <span className="text-[11px] text-[#F6C445] font-bold">/ 3,200</span>
+            <span className="text-[11px] text-[#F6C445] font-bold">/ {registrationsTarget.revised_goal.toLocaleString('en-IN')}</span>
           </span>
         </div>
         <div className="bg-[#1C0E0C] border border-[#381B16] px-5 py-3.5 rounded-2xl flex items-center justify-between">
-          <span className="text-xs font-bold text-[#C4ABA1] uppercase">Avg Show-Up Rate</span>
+          <div>
+            <span className="text-xs font-bold text-[#C4ABA1] uppercase block">Avg Show-Up Rate</span>
+            <span className="text-[9px] font-black text-[#34D399] uppercase tracking-wider">ACTUAL (EXCL. WALK-INS)</span>
+          </div>
           <span className="text-sm font-black text-[#34D399]">{avgShowupRate}%</span>
         </div>
-        <div className="bg-[#1C0E0C] border border-[#381B16] px-5 py-3.5 rounded-2xl flex items-center justify-between">
-          <span className="text-xs font-bold text-[#C4ABA1] uppercase">Projected Attendees</span>
-          <span className="text-sm font-black text-[#F6C445]">{projectedAttendees}</span>
+        <div
+          className="bg-[#1C0E0C] border border-[#381B16] px-5 py-3.5 rounded-2xl flex items-center justify-between"
+          title={`Campaign-level forecast using ₹${remainingSpend.toLocaleString('en-IN')} remaining budget across scalable channels (venue cap: ${forecast.capacityCeiling.toLocaleString('en-IN')})`}
+        >
+          <div>
+            <span className="text-xs font-bold text-[#C4ABA1] uppercase block">Projected Attendees</span>
+            <span className="text-[9px] font-black text-[#F6C445] uppercase tracking-wider">
+              PROJECTION {forecast.capacityCapped ? '(CAPACITY CAPPED)' : `(₹${(remainingSpend / 1000).toFixed(0)}K LEFT)`}
+            </span>
+          </div>
+          <span className="text-sm font-black text-[#F6C445]">{projectedAttendees.toLocaleString('en-IN')}</span>
         </div>
       </div>
 
@@ -314,20 +309,32 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Widget 1: Conversion Funnel Stages */}
         <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl flex flex-col justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider mb-4">
-            <span className="text-[#F6C445]">01.</span>
-            <span>FUNNEL CONVERSION STAGES</span>
+          <div className="flex items-center justify-between gap-1.5 text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider mb-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#F6C445]">01.</span>
+              <span>FUNNEL CONVERSION STAGES</span>
+            </div>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399]">DYNAMIC</span>
           </div>
           <div className="space-y-3 text-xs">
-            {funnelData.map((f, i) => (
+            {funnelStages.map((f, i) => (
               <div key={i} className="flex items-center justify-between pb-2 border-b border-[#3E201B]">
-                <span className="text-[#C4ABA1] font-semibold">{f.stage}</span>
-                <span className="font-black text-[#F6C445]">{f.actual.toLocaleString('en-IN')}</span>
+                <div>
+                  <span className="text-[#C4ABA1] font-semibold">{f.stage}</span>
+                  {f.conversionFromPrevPct !== null && (
+                    <span className="ml-2 text-[10px] font-bold text-[#34D399]">
+                      ({f.conversionFromPrevPct}%)
+                    </span>
+                  )}
+                </div>
+                <span className={`font-black ${f.kind === 'goal' ? 'text-[#FFFFFF]' : 'text-[#F6C445]'}`}>
+                  {f.actual.toLocaleString('en-IN')}
+                </span>
               </div>
             ))}
           </div>
           <div className="mt-4 pt-2 text-[10px] text-[#C4ABA1] text-center font-bold uppercase">
-            Identified → Admitted: 100%
+            Reg → Admitted: {regToAdmittedPct}% • Show-up: {avgShowupRate}%
           </div>
         </div>
 
@@ -580,6 +587,100 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           );
         })()}
+      </div>
+
+      {/* SECTION 5: Data Reconciliation, Stretch Economics & Strategy Deduplication */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Stretch Target Economics */}
+        <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider">
+              STRETCH TARGET ECONOMICS
+            </span>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#F6C445]/15 text-[#F6C445]">
+              TARGET / ASSUMPTION
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">Stretch Goal</span>
+              <span className="font-black text-[#F6C445]">{attendeesTarget.stretch_value.toLocaleString('en-IN')} attendees</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">Stretch Budget</span>
+              <span className="font-black text-[#FFFFFF]">₹{budgetTarget.stretch_value.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-[#C4ABA1]">Stretch CAC (₹3,00,000 ÷ 2,500)</span>
+              <span className="font-black text-[#34D399]">₹{stretchCac}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 5-Strategy Overlap & Deduplication */}
+        <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider">
+              STRATEGY DEDUPLICATION
+            </span>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#F6C445]/15 text-[#F6C445]">
+              ASSUMPTION
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">5 Strategies Gross Sum</span>
+              <span className="font-black text-[#FFFFFF]">+{strategyReconciliation.grossIncrementalSum.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">Multi-Touch Overlap & Cap ({strategyReconciliation.deduplicationRatePct}%)</span>
+              <span className="font-black text-[#F87171]">-{strategyReconciliation.overlapAndCapacityDeduction.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-[#C4ABA1]">Net Stretch Lift (vs {attendeesTarget.base_value} Base)</span>
+              <span className="font-black text-[#34D399]">+{strategyReconciliation.stretchTargetIncrease.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Historical Daily vs Campaign Reconciliation */}
+        <div className="bg-[#2B1613] border border-[#3E201B] p-6 rounded-3xl shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase text-[#FFFFFF] tracking-wider">
+              DAILY VS CAMPAIGN RECONCILIATION
+            </span>
+            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399]">
+              ACTUALS AUDIT
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">Registrations (Daily vs Campaigns)</span>
+              <span className="font-black text-[#FFFFFF]">
+                {reconciliation.dailyBaselineRegistrations.toLocaleString('en-IN')} vs {reconciliation.campaignRegistrations.toLocaleString('en-IN')}{' '}
+                <span className="text-[#F6C445]">({reconciliation.registrationVariance >= 0 ? '+' : ''}{reconciliation.registrationVariance})</span>
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-[#3E201B]">
+              <span className="text-[#C4ABA1]">Confirmed (Daily vs Campaigns)</span>
+              <span className="font-black text-[#FFFFFF]">
+                {reconciliation.dailyBaselineConfirmed.toLocaleString('en-IN')} vs {reconciliation.campaignConfirmed.toLocaleString('en-IN')}{' '}
+                <span className="text-[#C4ABA1]">({reconciliation.confirmedVariance >= 0 ? '+' : ''}{reconciliation.confirmedVariance})</span>
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-[#C4ABA1]">Live Admitted vs 2025 Baseline</span>
+              <span className="font-black text-[#34D399]">
+                {reconciliation.campaignAdmitted.toLocaleString('en-IN')} vs {reconciliation.dailyBaselineAdmitted.toLocaleString('en-IN')}{' '}
+                {reconciliation.admittedDeltaFromBaseline !== 0 && (
+                  <span className="text-[#F6C445]">
+                    ({reconciliation.admittedDeltaFromBaseline > 0 ? '+' : ''}{reconciliation.admittedDeltaFromBaseline})
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

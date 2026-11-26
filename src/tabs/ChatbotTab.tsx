@@ -11,13 +11,14 @@ import {
   Plus,
   ChevronRight
 } from 'lucide-react';
-import { Campaign, Target, Task, SuggestedTask, ChatLog } from '../types';
+import { Campaign, Target, Task, SuggestedTask, ChatLog, DailyMetric } from '../types';
 import { sendChatMessage } from '../services/gemini';
 import { api } from '../services/supabase';
 
 interface ChatbotTabProps {
   campaigns: Campaign[];
   targets: Target[];
+  dailyMetrics?: DailyMetric[];
   onTaskCreated: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onShowToast: (msg: string) => void;
   isFloating?: boolean;
@@ -36,6 +37,7 @@ interface MessageItem {
 export const ChatbotTab: React.FC<ChatbotTabProps> = ({
   campaigns,
   targets,
+  dailyMetrics = [],
   onTaskCreated,
   onShowToast,
   isFloating = false
@@ -136,7 +138,7 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
           content: m.content
         }));
 
-      const { reply, thought } = await sendChatMessage(conversationHistory, campaigns, targets, sessionId);
+      const { reply, thought } = await sendChatMessage(conversationHistory, campaigns, targets, sessionId, dailyMetrics);
       const parsed = parseTaskBlock(reply);
       const assistantMsgId = 'reply_' + Date.now();
 

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Bot, X, Maximize2, Minimize2, MessageSquare } from 'lucide-react';
-import { Campaign, Target, Task } from '../types';
+import { Campaign, Target, Task, DailyMetric } from '../types';
 import { ChatbotTab } from '../tabs/ChatbotTab';
 
 interface FloatingCopilotProps {
   campaigns: Campaign[];
   targets: Target[];
+  dailyMetrics?: DailyMetric[];
   onTaskCreated: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onShowToast: (msg: string) => void;
   hidden?: boolean;
@@ -14,6 +15,7 @@ interface FloatingCopilotProps {
 export const FloatingCopilot: React.FC<FloatingCopilotProps> = ({
   campaigns,
   targets,
+  dailyMetrics = [],
   onTaskCreated,
   onShowToast,
   hidden = false
@@ -74,6 +76,7 @@ export const FloatingCopilot: React.FC<FloatingCopilotProps> = ({
             <ChatbotTab
               campaigns={campaigns}
               targets={targets}
+              dailyMetrics={dailyMetrics}
               onTaskCreated={onTaskCreated}
               onShowToast={onShowToast}
               isFloating={true}

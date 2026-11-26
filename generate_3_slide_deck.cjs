@@ -102,7 +102,7 @@ async function buildThreeSlideDeck() {
     // Two Sub-Scenario Cards (Base & Stretch)
     const subTargets = [
       { label: 'REALISTIC BASE', num: '2,050', detail: '₹133.7 CAC\n66.8% Show-Up\n₹2.74L Spend' },
-      { label: 'STRETCH CEILING', num: '2,500', detail: '₹109.6 CAC\n83.3% Show-Up\n₹3.00L Budget' }
+      { label: 'STRETCH CEILING', num: '2,500', detail: '₹120 CAC\n83.3% Show-Up\n₹3.00L Budget' }
     ];
     subTargets.forEach((st, idx) => {
       const x = 0.55 + idx * 2.14;
@@ -222,9 +222,9 @@ async function buildThreeSlideDeck() {
       }
     ];
 
-    slide.addText('FIVE RANKED BETS (ICE FRAMEWORK)', {
-      x: 0.55, y: 1.08, w: 5.5, h: 0.2,
-      fontFace: FONT, fontSize: 8, bold: true, color: C.rust
+    slide.addText('FIVE RANKED BETS (+1,475 GROSS → +450 NET DEDUPLICATED)', {
+      x: 0.55, y: 1.08, w: 5.6, h: 0.2,
+      fontFace: FONT, fontSize: 7.5, bold: true, color: C.rust
     });
 
     bets.forEach((b, i) => {

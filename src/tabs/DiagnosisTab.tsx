@@ -21,6 +21,7 @@ import {
   Legend
 } from 'recharts';
 import { Campaign } from '../types';
+import { evaluateThreshold } from '../services/analytics';
 
 interface DiagnosisTabProps {
   campaigns: Campaign[];
@@ -31,13 +32,6 @@ interface DiagnosisTabProps {
 }
 
 type SortField = 'name' | 'spend_inr' | 'attendees' | 'cac_inr' | 'showup_rate' | 'registrations';
-
-const evaluateThreshold = (c: Campaign, cac: number, showup: number): 'scale' | 'change' | 'stop' => {
-  if (c.spend_inr === 0) return 'scale';
-  if (cac > 220 || (showup > 0 && showup < 60)) return 'stop';
-  if (cac >= 120 || (showup > 0 && showup < 75)) return 'change';
-  return 'scale';
-};
 
 export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
   campaigns,
@@ -78,7 +72,7 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
       if (aVal > bVal) return sortAsc ? 1 : -1;
       return 0;
     });
-  }, [campaigns, sortField, sortAsc]);
+  }, [campaigns, sortField, sortAsc, searchQuery]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -456,7 +450,16 @@ export const DiagnosisTab: React.FC<DiagnosisTabProps> = ({
                   </div>
                   <div>
                     <span className="text-[#C4ABA1] block text-[10px] font-bold">Attendees</span>
-                    <span className="font-bold text-[#FFFFFF]">{c.attendees}</span>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editAttendees}
+                        onChange={e => setEditAttendees(Number(e.target.value))}
+                        className="w-20 bg-[#2B1613] border border-[#F6C445] rounded-lg px-2 py-0.5 text-xs text-[#FFFFFF]"
+                      />
+                    ) : (
+                      <span className="font-bold text-[#FFFFFF]">{c.attendees}</span>
+                    )}
                   </div>
                   <div>
                     <span className="text-[#C4ABA1] block text-[10px] font-bold">CAC</span>

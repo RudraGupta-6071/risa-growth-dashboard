@@ -1,388 +1,460 @@
-import { Campaign, Target } from '../types';
+import { Campaign, DailyMetric, Target } from '../types';
 import { getStoredConfig } from './supabase';
+import {
+  CampaignMetrics,
+  computeDashboardAnalytics,
+  DashboardAnalytics,
+} from './analytics';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-export const buildSystemPrompt = (campaigns: Campaign[], targets: Target[]): string => {
+export const buildSystemPrompt = (
+  campaigns: Campaign[],
+  targets: Target[],
+  dailyMetrics: DailyMetric[] = []
+): string => {
+  const analytics = computeDashboardAnalytics(campaigns, targets, dailyMetrics);
+
   const campaignsJson = JSON.stringify(
-    campaigns.map(c => ({
-      id: c.id,
-      name: c.name,
-      channel: c.channel_type,
-      spend_inr: c.spend_inr,
-      attendees: c.attendees,
-      confirmed: c.confirmed,
-      registrations: c.registrations,
-      cac_inr: c.cac_inr ?? (c.attendees > 0 ? Math.round(c.spend_inr / c.attendees) : 0),
-      showup_rate: `${c.showup_rate ?? (c.confirmed > 0 ? ((c.attendees / c.confirmed) * 100).toFixed(2) : 0)}%`,
-      noshow_count: c.noshow_count,
-      status: c.status,
-      recommendation: c.recommendation
+    analytics.campaignMetrics.map(m => ({
+      id: m.campaign.id,
+      name: m.campaign.name,
+      channel: m.campaign.channel_type,
+      spend_inr: m.campaign.spend_inr,
+      impressions: m.campaign.impressions,
+      clicks: m.campaign.clicks,
+      reg_starts: m.campaign.reg_starts,
+      registrations: m.campaign.registrations,
+      confirmed: m.campaign.confirmed,
+      attendees: m.campaign.attendees,
+      noshow_count: m.noShows,
+      cancel_count: m.campaign.cancel_count,
+      cac_inr: m.cac,
+      showup_rate_pct: m.showupRate,
+      reg_conversion_pct: m.regConversionRate,
+      status: m.campaign.status,
+      recommendation: m.campaign.recommendation,
+      threshold_rule: m.thresholdRecommendation,
     })),
     null,
     2
   );
 
-  const targetsJson = JSON.stringify(targets, null, 2);
+  const deterministicSummary = JSON.stringify(
+    {
+      actuals: {
+        total_spend_inr: analytics.totalSpend,
+        total_attendees: analytics.totalAttendees,
+        paid_attendees: analytics.paidAttendees,
+        walk_in_attendees: analytics.walkInAttendees,
+        total_registrations: analytics.totalRegistrations,
+        total_confirmed: analytics.totalConfirmed,
+        total_noshows: analytics.totalNoShows,
+        blended_cac_inr: analytics.blendedCac,
+        paid_blended_cac_inr: analytics.paidBlendedCac,
+        avg_showup_rate_pct: analytics.avgShowupRate,
+      },
+      targets_and_gaps: {
+        attendee_goal: analytics.attendeesTarget.revised_goal,
+        attendee_gap: analytics.targetGap,
+        budget_limit_inr: analytics.budgetTarget.revised_goal,
+        remaining_budget_inr: analytics.remainingBudget,
+        stretch_attendees: analytics.attendeesTarget.stretch_value,
+        stretch_budget_inr: analytics.budgetTarget.stretch_value,
+        stretch_cac_inr: analytics.stretchCac,
+      },
+      rankings: {
+        by_cac_ascending: analytics.byCacAsc.map(m => ({
+          name: m.campaign.name,
+          cac_inr: m.cac,
+          attendees: m.campaign.attendees,
+          showup_rate_pct: m.showupRate,
+        })),
+        worst_showup: analytics.worstShowupCampaign
+          ? {
+              name: analytics.worstShowupCampaign.campaign.name,
+              showup_rate_pct: analytics.worstShowupCampaign.showupRate,
+              noshows: analytics.worstShowupCampaign.noShows,
+            }
+          : null,
+      },
+      forecast: analytics.forecast,
+      strategy_reconciliation: analytics.strategyReconciliation,
+      reallocation_suggestion: analytics.reallocationSuggestion
+        ? {
+            from: analytics.reallocationSuggestion.fromCampaign.campaign.name,
+            to: analytics.reallocationSuggestion.toCampaigns.map(c => c.campaign.name),
+            shift_inr: analytics.reallocationSuggestion.suggestedShiftAmount,
+            lost_attendees: analytics.reallocationSuggestion.estimatedLostAttendees,
+            gained_attendees: analytics.reallocationSuggestion.estimatedGainedAttendees,
+            net_gain: analytics.reallocationSuggestion.netAttendeeGain,
+            new_blended_cac_inr: analytics.reallocationSuggestion.newBlendedCac,
+          }
+        : null,
+    },
+    null,
+    2
+  );
 
   return `You are the RISA Festival Growth AI Copilot, embedded inside a live growth dashboard.
 
-Your job: help the growth team diagnose campaign performance, calculate metrics, recommend actions, and manage tasks — using only the data injected below.
+Your job: interpret questions, explain findings from the deterministic metrics below, recommend actions, and propose tasks — using ONLY the live data and pre-computed TypeScript calculations below.
 
 ═══════════════════════════════════════
-LIVE DATA (injected at query time)
+PRE-COMPUTED DETERMINISTIC ANALYTICS (source of truth)
 ═══════════════════════════════════════
+${deterministicSummary}
+
 CAMPAIGNS:
 ${campaignsJson}
 
 TARGETS:
-${targetsJson}
+${JSON.stringify(targets, null, 2)}
 
 ═══════════════════════════════════════
 WHAT YOU KNOW (sourced from the data)
 ═══════════════════════════════════════
 - Dataset covers RISA Festival 2025, synthetic data, cleaned and deduplicated.
 - "Attendee" = unique external person, admitted AND verified at check-in.
-- CAC = spend_inr / attendees. Computed field in DB.
-- Show-up rate = attendees / confirmed × 100. Computed field in DB.
-- Revised targets (effective 15 Mar 2025): 2,200 unique visitors, ₹3,00,000 budget.
-- Walk-ins have no campaign, no spend, CAC = 0.
-- 125 walk-ins are included in total attendees but excluded from campaign CAC.
-- Bangalore: 1,148 colleges (AISHE 2023-24, sourced). ~5.38L students (C&W/SAPFI 2018-19, sourced).
+- CAC = spend_inr / attendees. Stretch CAC = ₹3,00,000 / 2,500 = ₹120.
+- Show-up rate = attendees / confirmed × 100.
+- Walk-ins have no paid campaign, ₹0 spend, CAC = 0; included in total attendees but excluded from paid campaign CAC rankings.
+- 5 Growth Strategies gross sum (+1,475) vs Stretch increase (+450) reconciles via multi-touch overlap deduplication and budget/venue capacity limits (2,500 peak).
+- Bangalore: 1,148 colleges (AISHE 2023-24). ~5.38L students (C&W/SAPFI 2018-19).
 - Data ends 20 April 2025 (event day).
 
 ═══════════════════════════════════════
-WEBSITE NAVIGATION & TABS (help users navigate)
-═══════════════════════════════════════
-The left sidebar has 3 tabs, and the AI Copilot is a floating expandable widget in the bottom-right corner:
-1. DASHBOARD tab: Shows 3 hero KPIs (Admitted Attendees vs revised goal, Blended CAC, Budget Utilization), the Pre-Event Funnel Trajectory chart (01-15 to Event Day 20 Apr 2025), 3 audit widgets, a Live Constraints panel (EDIT CONSTRAINTS to change Attendee Target or Max Budget), and an interactive What-If Simulator slider (shift budget from Paid Social to Campus Ambassadors and Apply Shift Live).
-2. DIAGNOSIS tab: Lists all 8 channels with spend, attendees, CAC, show-up rate, and Scale/Change/Stop tags. Click Edit to modify spend or attendees—all metrics update live, and a THRESHOLD alert triggers automatically if CAC > ₹220 or Show-up < 60% (STOP), CAC ₹120–₹220 or Show-up < 75% (CHANGE), else SCALE.
-3. TASK BOARD tab: Operational checklist with owners, due dates, priorities, and statuses. Tasks proposed here appear there after clicking Confirm & Add.
-4. Floating AI COPILOT ("Ask AI Copilot" button in bottom-right): Available on every page and expandable. Diagnoses performance, models what-if reallocations, guides users through the site, and creates tasks.
-- RESET 2025 DATA button (sidebar): Restores original 2025 values and constraints.
-- Top Bar: Live search bar (filters Diagnosis & Task Board), "EVENT DAY: 20 APR 2025" badge, and "Download 3-Slide Deck (.pptx)" button.
-
-═══════════════════════════════════════
-WHAT YOU CANNOT ANSWER (say "The data can't answer this")
+WHAT YOU CANNOT ANSWER (acknowledge missing data explicitly)
 ═══════════════════════════════════════
 - Why any individual attended or cancelled.
 - Causal impact of sponsors on attendance.
-- What would happen if you ran a different campaign.
 - Anything after 20 April 2025.
-- NPS, satisfaction, or attendee demographics (not in dataset).
+- NPS, satisfaction, ticket pricing tiers, weather, or attendee demographics (age, gender, college major breakdown per attendee) — NOT in dataset.
 - Whether the data represents real people or events.
+When asked about any unavailable data, explicitly state what is missing from the dataset instead of guessing or fabricating.
 
 ═══════════════════════════════════════
 RULES
 ═══════════════════════════════════════
-1. Only use data above. Never hallucinate numbers.
-2. Show calculations step by step: "CAC = ₹93,000 / 340 = ₹274."
-3. Prefix assumptions with "ASSUMPTION:" clearly.
-4. For campaign diagnosis, always include: CAC, show-up rate, comparison to best channel.
-5. Task creation: when suggesting a task, end your reply with a fenced block:
+1. Never recalculate or contradict the pre-computed deterministic numbers above.
+2. Clearly distinguish ACTUALS, PROJECTIONS, and ASSUMPTIONS (prefix assumptions with "ASSUMPTION:").
+3. Show math cleanly when explaining CAC or gaps: e.g. "CAC = ₹93,000 / 340 = ₹274."
+4. For campaign diagnosis, always include: CAC, show-up rate, no-shows, and comparison to the lowest-CAC paid channel.
+5. Task creation: when proposing a task, end your reply with a fenced block (the UI requires user confirmation before saving):
 \`\`\`task
 {"title": "...", "description": "...", "owner": "Growth Lead", "priority": "high", "campaign_id": 1}
 \`\`\`
-6. For follow-up questions, use the previous messages to stay consistent.
-7. Be concise. No more than 5 sentences unless doing a full diagnosis.
-8. If data was recently edited, acknowledge that the numbers shown are the current live values.`;
+6. For follow-up questions, use conversation history AND the current live data (which may have been edited by the user).
+7. Be concise and direct.`;
 };
 
-// Comprehensive, intelligent offline engine capable of answering any question dynamically from live data
+const findMentionedCampaign = (
+  text: string,
+  analytics: DashboardAnalytics
+): CampaignMetrics | undefined => {
+  const q = text.toLowerCase();
+  return analytics.campaignMetrics.find(m => {
+    const name = m.campaign.name.toLowerCase();
+    const channel = m.campaign.channel_type.toLowerCase();
+    if (q.includes(name) || q.includes(channel)) return true;
+    if (name.includes('ambassador') && q.includes('ambassador')) return true;
+    if (name.includes('paid social') && (q.includes('paid social') || q.includes('meta'))) return true;
+    if (name.includes('creator') && (q.includes('creator') || q.includes('influencer'))) return true;
+    if (name.includes('college') && (q.includes('college') || q.includes('partnership') || q.includes('club'))) return true;
+    if (name.includes('referral') && (q.includes('referral') || q.includes('squad'))) return true;
+    if (name.includes('organic') && q.includes('organic')) return true;
+    if (name.includes('community') && q.includes('community')) return true;
+    if (name.includes('walk') && (q.includes('walk-in') || q.includes('walkin') || q.includes('walk in'))) return true;
+    return false;
+  });
+};
+
+const resolveCampaignFromHistory = (
+  query: string,
+  history: ChatMessage[],
+  analytics: DashboardAnalytics
+): CampaignMetrics | undefined => {
+  const direct = findMentionedCampaign(query, analytics);
+  if (direct) return direct;
+
+  // Check recent turns for follow-ups ("it", "that campaign", "this channel", etc.)
+  const isFollowUpRef = /\b(it|its|that|this|they|them|the channel|the campaign|same)\b/i.test(query);
+  if (isFollowUpRef) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const match = findMentionedCampaign(history[i].content, analytics);
+      if (match) return match;
+    }
+  }
+  return undefined;
+};
+
+const formatCampaignDiagnosis = (
+  m: CampaignMetrics,
+  analytics: DashboardAnalytics
+): string => {
+  const best = analytics.bestCacCampaign;
+  const isUnderperforming = m.thresholdRecommendation === 'stop' || m.campaign.recommendation === 'stop';
+  const cacComparison =
+    best && best.campaign.id !== m.campaign.id && best.cac > 0 && m.cac > 0
+      ? ` (${(m.cac / best.cac).toFixed(1)}× higher than lowest-CAC paid channel ${best.campaign.name} at ₹${best.cac})`
+      : '';
+
+  if (m.campaign.channel_type === 'walk_in') {
+    return `**${m.campaign.name} (ACTUALS):**
+- **Admitted Attendees:** ${m.campaign.attendees.toLocaleString('en-IN')}
+- **Spend:** ₹${m.campaign.spend_inr.toLocaleString('en-IN')} | **CAC:** ₹${m.cac} (excluded from paid CAC rankings)
+- **Status:** Included in total festival admissions (${analytics.totalAttendees.toLocaleString('en-IN')}).`;
+  }
+
+  return `**${m.campaign.name} Diagnosis (Live ACTUALS):**
+- **CAC:** ₹${m.campaign.spend_inr.toLocaleString('en-IN')} / ${m.campaign.attendees} = **₹${m.cac}**${cacComparison}
+- **Show-Up Rate:** ${m.campaign.attendees} / ${m.campaign.confirmed} = **${m.showupRate}%** (Festival avg: ${analytics.avgShowupRate}%)
+- **Funnel Drop-off:** ${m.noShows} no-shows and ${m.campaign.cancel_count} cancellations out of ${m.campaign.confirmed} confirmed (${m.regConversionRate}% reg-start completion).
+- **Threshold Status:** **${m.thresholdRecommendation.toUpperCase()}**${
+    isUnderperforming
+      ? ' — High CAC and/or low show-up conversion indicate low attendee intent.'
+      : ' — Unit economics are within healthy scaling thresholds.'
+  }`;
+};
+
+// Deterministic TypeScript engine using live computed analytics & conversation history
 export const fallbackChatEngine = (
   userMessage: string,
   campaigns: Campaign[],
-  targets: Target[]
+  targets: Target[],
+  conversationHistory: ChatMessage[] = [],
+  dailyMetrics: DailyMetric[] = []
 ): string => {
   const query = userMessage.toLowerCase().trim();
+  const analytics = computeDashboardAnalytics(campaigns, targets, dailyMetrics);
+  const {
+    totalSpend,
+    totalAttendees,
+    totalConfirmed,
+    totalRegistrations,
+    blendedCac,
+    avgShowupRate,
+    attendeesTarget,
+    budgetTarget,
+    stretchCac,
+    targetGap,
+    remainingBudget,
+    bestCacCampaign,
+    worstCacCampaign,
+    worstShowupCampaign,
+    forecast,
+    strategyReconciliation,
+    reallocationSuggestion,
+  } = analytics;
 
-  // Helper getters
-  const totalSpend = campaigns.reduce((s, c) => s + c.spend_inr, 0);
-  const totalAttendees = campaigns.reduce((s, c) => s + c.attendees, 0);
-  const totalConfirmed = campaigns.reduce((s, c) => s + c.confirmed, 0);
-  const totalRegistrations = campaigns.reduce((s, c) => s + c.registrations, 0);
-  const blendedCac = totalAttendees > 0 ? Math.round(totalSpend / totalAttendees) : 0;
-  const overallShowup = totalConfirmed > 0 ? ((totalAttendees / totalConfirmed) * 100).toFixed(1) : '0';
-
-  const attendeeTargetObj = targets.find(t => t.metric === 'attendees') || { base_value: 2050, stretch_value: 2500, revised_goal: 2200 };
-  const budgetTargetObj = targets.find(t => t.metric === 'budget_inr') || { base_value: 274000, stretch_value: 300000, revised_goal: 300000 };
-
-  const activeCampaigns = campaigns.filter(c => c.spend_inr > 0);
-  const sortedByCacAsc = [...activeCampaigns].sort((a, b) => (a.cac_inr || Math.round(a.spend_inr / a.attendees)) - (b.cac_inr || Math.round(b.spend_inr / b.attendees)));
-  const bestCacCampaign = sortedByCacAsc[0] || campaigns[0];
-  const worstCacCampaign = sortedByCacAsc[sortedByCacAsc.length - 1] || campaigns[0];
-
-  // 0. Conversational greetings & acknowledgements
+  // 0. Greetings & acknowledgements
   if (/^(hi|hey|hello|yo|hiya|good morning|good evening|thanks|thank you|cool|nice|got it)[\s!.]*$/i.test(query)) {
     if (query.includes('thank') || query.includes('cool') || query.includes('nice') || query.includes('got it')) {
-      return `Anytime! Let me know if you want to explore another channel, test a budget shift, or add a task to the board.`;
+      return `Anytime! Ask me about another channel, test a budget reallocation, or propose a growth task.`;
     }
-    return `Hey! I'm here to help you explore the RISA Festival growth data. You can ask me anything—like which channels are performing best, how to close the ${attendeeTargetObj.revised_goal - totalAttendees}-attendee gap, or how to navigate the dashboard.`;
+    const gapText =
+      targetGap > 0
+        ? `closing the ${targetGap}-attendee gap to ${attendeesTarget.revised_goal.toLocaleString('en-IN')}`
+        : `maintaining our lead above the ${attendeesTarget.revised_goal.toLocaleString('en-IN')} goal`;
+    return `Hey! I'm analyzing live RISA '25 data (${totalAttendees.toLocaleString('en-IN')} admitted, ₹${blendedCac} blended CAC). Ask me about channel CACs, underperforming campaigns, budget reallocation, or ${gapText}.`;
   }
 
-  // 1. Unanswerable check (Strictly follows "The data can't answer this" prompt instruction)
-  const unanswerableTriggers = [
-    'why did attendee', 'why attendees chose', 'food', 'sponsor', 'sponsorship',
-    'satisfaction', 'nps', 'demographics', 'after april 20', 'future',
-    'weather', 'survey', 'gender', 'age', 'next year', '2026', 'real people',
-    'music genre', 'rating', 'feedback', 'sentiment'
+  // 1. Missing / Unanswerable Data Check — explicitly acknowledge missing data
+  const missingDataCategories: { triggers: string[]; missing: string }[] = [
+    {
+      triggers: ['age', 'gender', 'demographic', 'income', 'major', 'department'],
+      missing: 'attendee demographics (age, gender, income, or individual major breakdown)',
+    },
+    {
+      triggers: ['nps', 'satisfaction', 'rating', 'feedback', 'sentiment', 'review', 'survey'],
+      missing: 'post-event NPS, satisfaction scores, or survey feedback',
+    },
+    {
+      triggers: ['sponsor', 'sponsorship', 'roi of sponsor'],
+      missing: 'causal impact of sponsors on attendee turnout',
+    },
+    {
+      triggers: ['weather', 'rain', 'food', 'music genre', 'artist'],
+      missing: 'event-day weather, food preferences, or artist-level attribution',
+    },
+    {
+      triggers: ['after april 20', '2026', 'next year', 'post-event'],
+      missing: 'any metrics after Event Day (20 April 2025)',
+    },
+    {
+      triggers: ['why did attendee', 'individual', 'specific person', 'real people'],
+      missing: 'individual-level reasons for attending/cancelling or real-world identity data (dataset is synthetic)',
+    },
   ];
-  if (unanswerableTriggers.some(t => query.includes(t)) && !query.includes('underperforming') && !query.includes('paid social') && !query.includes('cac')) {
-    return "The data can't answer this.";
+
+  const matchedMissing = missingDataCategories.find(cat => cat.triggers.some(t => query.includes(t)));
+  if (matchedMissing) {
+    return `I can't answer that from the dataset — **${matchedMissing.missing}** are not tracked in the RISA 2025 data. I can only analyze campaign spend, funnel counts (impressions, clicks, reg starts, registrations, confirmed, admitted), CAC, show-up rates, targets, and tasks.`;
   }
 
-  // 2. Explicit Task Creation
-  if (query.startsWith('create a task') || query.startsWith('add a task') || query.includes('suggest a task') || query.includes('make a task') || (query.includes('task') && (query.includes('create') || query.includes('add')))) {
-    if (query.includes('creator partner') || query.includes('creator')) {
-      const cp = campaigns.find(c => c.name.toLowerCase().includes('creator')) || campaigns[2];
-      const cac = cp.cac_inr || Math.round(cp.spend_inr / cp.attendees);
-      return `Creator Partners has an unsustainable CAC of ₹${cac} with only ${cp.attendees} attendees from ₹${cp.spend_inr.toLocaleString('en-IN')} spend. Here is the suggested task to action this:
+  // 2. Task Creation (always requires user confirmation via ```task block)
+  const asksForTask =
+    query.includes('create a task') ||
+    query.includes('add a task') ||
+    query.includes('suggest a task') ||
+    query.includes('make a task') ||
+    (query.includes('task') && (query.includes('create') || query.includes('add') || query.includes('propose') || query.includes('draft')));
+
+  if (asksForTask) {
+    const referenced = resolveCampaignFromHistory(query, conversationHistory, analytics);
+    if (referenced) {
+      const actionVerb =
+        referenced.thresholdRecommendation === 'stop'
+          ? 'Cut / Reallocate'
+          : referenced.thresholdRecommendation === 'scale'
+          ? 'Scale'
+          : 'Optimize';
+      const priority = referenced.thresholdRecommendation === 'stop' || referenced.thresholdRecommendation === 'scale' ? 'high' : 'medium';
+      const desc =
+        referenced.thresholdRecommendation === 'stop'
+          ? `${referenced.campaign.name} has CAC ₹${referenced.cac} and ${referenced.showupRate}% show-up (${referenced.noShows} no-shows). Cut spend and reallocate to ${bestCacCampaign?.campaign.name || 'lowest-CAC channels'}.`
+          : `${referenced.campaign.name} delivers ${referenced.campaign.attendees} attendees at ₹${referenced.cac} CAC (${referenced.showupRate}% show-up). Expand execution within remaining ₹${remainingBudget.toLocaleString('en-IN')} budget.`;
+
+      return `Based on live metrics for **${referenced.campaign.name}** (CAC ₹${referenced.cac}, ${referenced.showupRate}% show-up), please confirm below to add this task:
 
 \`\`\`task
-{"title": "Cut Creator Partners budget", "description": "Freeze Creator Partners budget (CAC ₹${cac}) and reallocate remaining capital to Campus Ambassadors.", "owner": "Growth Lead", "priority": "high", "campaign_id": ${cp.id}}
+{"title": "${actionVerb} ${referenced.campaign.name} campaign", "description": "${desc}", "owner": "Growth Lead", "priority": "${priority}", "campaign_id": ${referenced.campaign.id}}
 \`\`\``;
     }
 
-    if (query.includes('paid social') || query.includes('meta')) {
-      const ps = campaigns.find(c => c.name.toLowerCase().includes('paid social')) || campaigns[0];
-      const cac = ps.cac_inr || Math.round(ps.spend_inr / ps.attendees);
-      return `Paid Social accounts for ₹${ps.spend_inr.toLocaleString('en-IN')} spend at a high ₹${cac} CAC and ${ps.noshow_count} no-shows. Here is the action task:
+    if (query.includes('reminder') || query.includes('whatsapp') || query.includes('show up') || query.includes('show-up') || query.includes('no-show')) {
+      return `With **${analytics.totalNoShows} total no-shows** (${(100 - avgShowupRate).toFixed(1)}% drop-off from confirmed), please confirm below to add this reminder task:
 
 \`\`\`task
-{"title": "Pause Paid Social & Reallocate ₹28K", "description": "Pause underperforming Meta ad sets (CAC ₹${cac}) and redirect funds to Campus Ambassadors and College Partnerships.", "owner": "Growth Lead", "priority": "high", "campaign_id": ${ps.id}}
+{"title": "Launch T-7 / T-3 / T-1 Show-up Reminder Sequence", "description": "Target ${analytics.totalNoShows} historical no-show gap across ${totalConfirmed.toLocaleString('en-IN')} confirmed sign-ups using WhatsApp/SMS QR passes.", "owner": "Growth Lead", "priority": "high", "campaign_id": null}
 \`\`\``;
     }
 
-    if (query.includes('ambassador')) {
-      const ca = campaigns.find(c => c.name.toLowerCase().includes('ambassador')) || campaigns[1];
-      return `Campus Ambassadors is our core growth engine (${ca.attendees} attendees, ₹${ca.cac_inr || 108} CAC). Here is the proposed task:
+    const fallbackTarget = worstCacCampaign || analytics.campaignMetrics[0];
+    return `Here is a proposed task based on your current highest-CAC channel (**${fallbackTarget?.campaign.name}** at ₹${fallbackTarget?.cac}). Click **Confirm & Add** to save it:
 
 \`\`\`task
-{"title": "Scale Campus Ambassador Network to 35 Reps", "description": "Recruit 15 additional campus reps across Tier 1 Bangalore colleges with tiered milestone rewards.", "owner": "Partnerships Manager", "priority": "high", "campaign_id": ${ca.id}}
+{"title": "Review ${fallbackTarget?.campaign.name || 'Campaign'} unit economics", "description": "Audit ₹${fallbackTarget?.campaign.spend_inr.toLocaleString('en-IN')} spend at ₹${fallbackTarget?.cac} CAC and ${fallbackTarget?.showupRate}% show-up.", "owner": "Growth Lead", "priority": "high", "campaign_id": ${fallbackTarget?.campaign.id ?? 'null'}}
 \`\`\``;
+  }
+
+  // 3. Budget Reallocation Recommendation (deterministic from live data)
+  if (query.includes('reallocat') || query.includes('shift budget') || query.includes('move budget') || (query.includes('budget') && query.includes('recommend'))) {
+    if (!reallocationSuggestion) {
+      return `No reallocation candidate is currently available because active paid spend is too low to shift.`;
     }
-
-    if (query.includes('reminder') || query.includes('whatsapp') || query.includes('show up') || query.includes('show-up')) {
-      return `To tackle the 34.3% confirmed dropout rate, here is the automated reminder task:
-
-\`\`\`task
-{"title": "Launch WhatsApp Show-up Reminder Sequence", "description": "Deploy automated WhatsApp messages at T-7, T-3, and T-1 days with dynamic QR passes to boost show-up from 66.8% to 76.5%.", "owner": "Growth Lead", "priority": "high", "campaign_id": null}
-\`\`\``;
-    }
-
-    return `Here is a prioritized operational task based on your request:
-
-\`\`\`task
-{"title": "Growth optimization task", "description": "Execute targeted channel optimization based on live performance metrics.", "owner": "Growth Lead", "priority": "medium", "campaign_id": null}
-\`\`\``;
+    const { fromCampaign, toCampaigns, suggestedShiftAmount, estimatedLostAttendees, estimatedGainedAttendees, netAttendeeGain, newBlendedCac } = reallocationSuggestion;
+    const toNames = toCampaigns.map(c => `${c.campaign.name} (₹${c.cac} CAC)`).join(' and ');
+    return `**Deterministic Budget Reallocation Recommendation:**
+- **Source (Cut 30%):** **${fromCampaign.campaign.name}** — current CAC ₹${fromCampaign.cac}, ${fromCampaign.showupRate}% show-up (${fromCampaign.noShows} no-shows). Shifting **₹${suggestedShiftAmount.toLocaleString('en-IN')}** reduces it by ~${estimatedLostAttendees} attendees.
+- **Destination (Scale):** **${toNames}**.
+- **ASSUMPTION (Constant Marginal CAC):** Reallocating ₹${suggestedShiftAmount.toLocaleString('en-IN')} yields ~**${estimatedGainedAttendees} attendees**, for a net gain of **${netAttendeeGain >= 0 ? '+' : ''}${netAttendeeGain} attendees** (new blended CAC: **₹${newBlendedCac}**) with ₹0 added budget.`;
   }
 
-  // 3. Paid Social Diagnosis
-  if (query.includes('paid social') && (query.includes('why') || query.includes('underperforming') || query.includes('diagnos') || query.includes('perform') || query.includes('bad') || query.includes('poor'))) {
-    const ps = campaigns.find(c => c.name.toLowerCase().includes('paid social')) || campaigns[0];
-    const cac = ps.cac_inr || Math.round(ps.spend_inr / ps.attendees);
-    const bestCacVal = bestCacCampaign.cac_inr || Math.round(bestCacCampaign.spend_inr / bestCacCampaign.attendees);
-    const showup = ps.showup_rate || Number(((ps.attendees / ps.confirmed) * 100).toFixed(2));
-    
-    return `Based on live data, **Paid Social** is severely underperforming:
-1. **CAC:** CAC = spend / attendees = ₹${ps.spend_inr.toLocaleString('en-IN')} / ${ps.attendees} = **₹${cac}**. This is nearly 4× worse than our best channel (${bestCacCampaign.name} at ₹${bestCacVal}).
-2. **Show-up Rate:** Show-up rate = attendees / confirmed = ${ps.attendees} / ${ps.confirmed} = **${showup}%** (vs 82.3% for Campus Ambassadors).
-3. **No-Show Gap:** Out of ${ps.confirmed} confirmed sign-ups, **${ps.noshow_count || (ps.confirmed - ps.attendees)} failed to show up** (plus ${ps.cancel_count} cancellations).
-4. **Diagnosis:** High drop-off between click and verified gate check-in indicates low intent from digital social ads. 
-Recommendation: **STOP** or cut spend by 30% (-₹28K) and reallocate to Ambassadors.`;
+  // 4. Stretch CAC & 5-Strategy Reconciliation
+  if (query.includes('stretch') || query.includes('1,475') || query.includes('1475') || query.includes('overlap') || query.includes('dedup')) {
+    return `**Stretch Target & Strategy Deduplication Reconciliation:**
+- **Stretch CAC (ACTUAL FORMULA):** ₹${budgetTarget.stretch_value.toLocaleString('en-IN')} / ${attendeesTarget.stretch_value.toLocaleString('en-IN')} = **₹${stretchCac}** per attendee.
+- **5 Strategies Gross Sum:** +${strategyReconciliation.grossIncrementalSum.toLocaleString('en-IN')} incremental attendees across the 5 growth initiatives.
+- **Deduplication & Capacity Cap:** Subtracting **${strategyReconciliation.overlapAndCapacityDeduction.toLocaleString('en-IN')}** (${strategyReconciliation.deduplicationRatePct}%) for multi-touch channel overlap, baseline run-rate overlap, and the ${forecast.capacityCeiling.toLocaleString('en-IN')} venue capacity ceiling reconciles to the **+${strategyReconciliation.stretchTargetIncrease}** net stretch increase (${attendeesTarget.base_value} → ${attendeesTarget.stretch_value}).`;
   }
 
-  // 4. Specific Campaign Inquiries
-  // Campus Ambassadors
-  if (query.includes('ambassador')) {
-    const ca = campaigns.find(c => c.name.toLowerCase().includes('ambassador')) || campaigns[1];
-    const cac = ca.cac_inr || Math.round(ca.spend_inr / ca.attendees);
-    const showup = ca.showup_rate || Number(((ca.attendees / ca.confirmed) * 100).toFixed(2));
-    return `**Campus Ambassadors Performance:**
-- **Spend:** ₹${ca.spend_inr.toLocaleString('en-IN')}
-- **Attendees:** ${ca.attendees} (highest volume of all paid campaigns)
-- **CAC:** CAC = spend / attendees = ₹${ca.spend_inr.toLocaleString('en-IN')} / ${ca.attendees} = **₹${cac}**
-- **Show-up Rate:** ${ca.attendees} / ${ca.confirmed} = **${showup}%** (very high commitment)
-- **Recommendation:** **SCALE (DOUBLE DOWN)**. Increasing reps from 20 to 35 in Bangalore's Tier 1 hubs delivers +420 incremental attendees.`;
-  }
-
-  // Creator Partners
-  if (query.includes('creator') || query.includes('influencer')) {
-    const cp = campaigns.find(c => c.name.toLowerCase().includes('creator')) || campaigns[2];
-    const cac = cp.cac_inr || Math.round(cp.spend_inr / cp.attendees);
-    const showup = cp.showup_rate || Number(((cp.attendees / cp.confirmed) * 100).toFixed(2));
-    return `**Creator Partners Diagnosis:**
-- **Spend:** ₹${cp.spend_inr.toLocaleString('en-IN')} (21.5% of total budget)
-- **Attendees:** Only ${cp.attendees} admitted visitors
-- **CAC:** CAC = spend / attendees = ₹${cp.spend_inr.toLocaleString('en-IN')} / ${cp.attendees} = **₹${cac}** (highest CAC of all channels!)
-- **Show-up Rate:** ${cp.attendees} / ${cp.confirmed} = **${showup}%** with ${cp.noshow_count} no-shows.
-- **Recommendation:** **STOP**. High vanity reach without actual gate attendance. Freeze creator budget immediately.`;
-  }
-
-  // College Partnerships
-  if (query.includes('college partnership') || query.includes('partnership') || query.includes('college club')) {
-    const cp = campaigns.find(c => c.name.toLowerCase().includes('partnership')) || campaigns[3];
-    const cac = cp.cac_inr || Math.round(cp.spend_inr / cp.attendees);
-    const showup = cp.showup_rate || Number(((cp.attendees / cp.confirmed) * 100).toFixed(2));
-    return `**College Partnerships Performance:**
-- **Spend:** ₹${cp.spend_inr.toLocaleString('en-IN')}
-- **Attendees:** ${cp.attendees} admitted
-- **CAC:** CAC = spend / attendees = ₹${cp.spend_inr.toLocaleString('en-IN')} / ${cp.attendees} = **₹${cac}**
-- **Show-up Rate:** ${cp.attendees} / ${cp.confirmed} = **${showup}%** (the highest show-up rate across all channels!)
-- **Recommendation:** **SCALE**. Co-hosting college dance/music society semi-finals at RISA locks in committed bulk student contingents.`;
-  }
-
-  // Student Referrals
-  if (query.includes('referral') || query.includes('student referral') || query.includes('squad pass')) {
-    const sr = campaigns.find(c => c.name.toLowerCase().includes('referral')) || campaigns[4];
-    const cac = sr.cac_inr || Math.round(sr.spend_inr / sr.attendees);
-    const showup = sr.showup_rate || Number(((sr.attendees / sr.confirmed) * 100).toFixed(2));
-    return `**Student Referrals Performance:**
-- **Spend:** ₹${sr.spend_inr.toLocaleString('en-IN')}
-- **Attendees:** ${sr.attendees}
-- **CAC:** CAC = spend / attendees = ₹${sr.spend_inr.toLocaleString('en-IN')} / ${sr.attendees} = **₹${cac}** (cheapest CAC of all paid channels!)
-- **Show-up Rate:** ${sr.attendees} / ${sr.confirmed} = **${showup}%**
-- **Recommendation:** **SCALE**. Virality coefficient k=1.24. Unlock automated "Buy 3 Get 1" Squad Pass on WhatsApp to accelerate referrals.`;
-  }
-
-  // Walk-ins
-  if (query.includes('walk-in') || query.includes('walkin') || query.includes('gate registration')) {
-    const wi = campaigns.find(c => c.name.toLowerCase().includes('walk-in') || c.name.toLowerCase().includes('walk')) || campaigns[7];
-    return `**Walk-ins Attribution:**
-- **Attendees:** ${wi ? wi.attendees : 125} admitted visitors
-- **Spend:** ₹0
-- **CAC:** ₹0 (Walk-ins have no paid campaign and ₹0 spend)
-- **Note:** Walk-ins are included in total festival admissions (2,050 actuals) but excluded from paid campaign CAC calculations.`;
-  }
-
-  // Community Groups & Organic Search
-  if (query.includes('community') || query.includes('organic')) {
-    const targetName = query.includes('community') ? 'Community Groups' : 'Organic Search';
-    const c = campaigns.find(x => x.name.toLowerCase().includes(targetName.toLowerCase())) || campaigns[5];
-    const cac = c.cac_inr || Math.round(c.spend_inr / c.attendees);
-    return `**${c.name} Performance:**
-- **Spend:** ₹${c.spend_inr.toLocaleString('en-IN')}
-- **Attendees:** ${c.attendees}
-- **CAC:** ₹${cac} | **Show-up:** ${c.showup_rate}%
-- **Status:** **${c.recommendation.toUpperCase()}**. Moderate performance; maintain current runway without over-allocating capital.`;
-  }
-
-  // 5. Best CAC / Lowest CAC
+  // 5. Lowest / Best CAC
   if (query.includes('best cac') || query.includes('lowest cac') || query.includes('cheapest') || query.includes('most cost effective') || query.includes('most efficient')) {
-    const cac = bestCacCampaign.cac_inr || Math.round(bestCacCampaign.spend_inr / bestCacCampaign.attendees);
-    return `The live data shows that **${bestCacCampaign.name}** has the best (lowest) CAC among paid channels:
-- **CAC Calculation:** CAC = spend / attendees = ₹${bestCacCampaign.spend_inr.toLocaleString('en-IN')} / ${bestCacCampaign.attendees} = **₹${cac}**.
-- **Attendees:** ${bestCacCampaign.attendees} admitted students.
-- **Show-up Rate:** ${bestCacCampaign.showup_rate}%.
-- **Action:** Recommended to **${bestCacCampaign.recommendation.toUpperCase()}**.`;
+    if (!bestCacCampaign) return `No paid campaigns with positive attendees are available to rank.`;
+    const runnerUp = analytics.byCacAsc[1];
+    return `Based on live data, **${bestCacCampaign.campaign.name}** has the lowest CAC among paid channels:
+- **CAC:** ₹${bestCacCampaign.campaign.spend_inr.toLocaleString('en-IN')} / ${bestCacCampaign.campaign.attendees} = **₹${bestCacCampaign.cac}**
+- **Show-up Rate:** ${bestCacCampaign.showupRate}% (${bestCacCampaign.campaign.attendees} / ${bestCacCampaign.campaign.confirmed} confirmed)
+${runnerUp ? `- **Runner-up:** ${runnerUp.campaign.name} at **₹${runnerUp.cac}** CAC (${runnerUp.showupRate}% show-up).` : ''}
+- *Note: Walk-ins (${analytics.walkInAttendees} attendees, ₹0 spend) are excluded from paid CAC rankings.*`;
   }
 
-  // 6. Worst CAC / Highest CAC
-  if (query.includes('worst cac') || query.includes('highest cac') || query.includes('most expensive') || query.includes('least efficient')) {
-    const cac = worstCacCampaign.cac_inr || Math.round(worstCacCampaign.spend_inr / worstCacCampaign.attendees);
-    return `**${worstCacCampaign.name}** has the worst (highest) CAC across all channels:
-- **CAC Calculation:** CAC = spend / attendees = ₹${worstCacCampaign.spend_inr.toLocaleString('en-IN')} / ${worstCacCampaign.attendees} = **₹${cac}**.
-- **Spend:** ₹${worstCacCampaign.spend_inr.toLocaleString('en-IN')} for only ${worstCacCampaign.attendees} attendees.
-- **Action:** Recommended to **STOP** or cut spend immediately to prevent budget bleeding.`;
+  // 6. Worst / Highest CAC or Underperforming Campaigns
+  if (query.includes('worst cac') || query.includes('highest cac') || query.includes('most expensive') || query.includes('least efficient') || (query.includes('underperform') && !resolveCampaignFromHistory(query, conversationHistory, analytics))) {
+    if (!worstCacCampaign) return `No paid campaigns with positive attendees are available to rank.`;
+    return formatCampaignDiagnosis(worstCacCampaign, analytics);
   }
 
-  // 7. Target Gap & Shortfall (Can we reach 2200?)
-  if (query.includes('short') || query.includes('revised goal') || query.includes('target gap') || query.includes('how many attendees') || query.includes('reach 2200') || query.includes('gap') || query.includes('shortfall')) {
-    const target = attendeeTargetObj.revised_goal || 2200;
-    const gap = target - totalAttendees;
-    const percent = ((totalAttendees / target) * 100).toFixed(1);
-
-    return `**Target vs Actuals Analysis:**
-- **Current Admitted:** ${totalAttendees.toLocaleString('en-IN')} (including 125 walk-ins)
-- **Revised Goal:** ${target.toLocaleString('en-IN')} attendees
-- **Shortfall:** Shortfall = ${target} - ${totalAttendees} = **${gap} attendees** (${percent}% achieved)
-- **Path to Target:** Yes, we can hit 2,200. Reallocating ₹28,000 from Paid Social into Campus Ambassadors (+110) and Student Referrals (+80) bridges the gap (+190 net gain) with ₹0 additional budget required!`;
+  // 7. Specific Campaign Diagnosis or Follow-up on a Campaign
+  const targetCampaign = resolveCampaignFromHistory(query, conversationHistory, analytics);
+  if (targetCampaign) {
+    return formatCampaignDiagnosis(targetCampaign, analytics);
   }
 
-  // 8. Budget & Spend Questions
-  if (query.includes('budget') || query.includes('spend') || query.includes('money') || query.includes('cost')) {
-    const budget = budgetTargetObj.revised_goal || 300000;
-    const remaining = budget - totalSpend;
-    return `**Budget & Financial Overview:**
-- **Total Festival Budget:** ₹${budget.toLocaleString('en-IN')}
-- **Current Total Spend:** ₹${totalSpend.toLocaleString('en-IN')} (${((totalSpend / budget) * 100).toFixed(1)}% burned)
-- **Unallocated Runway:** ₹${remaining.toLocaleString('en-IN')} remaining
-- **Blended CAC:** CAC = total spend / total attendees = ₹${totalSpend.toLocaleString('en-IN')} / ${totalAttendees} = **₹${blendedCac}** per attendee.`;
+  // 8. Target Gap, Shortfall & Forecast
+  if (query.includes('short') || query.includes('revised goal') || query.includes('target') || query.includes('gap') || query.includes('shortfall') || query.includes('project') || query.includes('forecast') || query.includes('reach')) {
+    const pct = attendeesTarget.revised_goal > 0 ? ((totalAttendees / attendeesTarget.revised_goal) * 100).toFixed(1) : '0';
+    return `**Live Target & Campaign-Level Forecast:**
+- **Actual Admitted:** ${totalAttendees.toLocaleString('en-IN')} (${pct}% of ${attendeesTarget.revised_goal.toLocaleString('en-IN')} goal; gap = **${targetGap > 0 ? targetGap : 0}**)
+- **Remaining Budget:** ₹${remainingBudget.toLocaleString('en-IN')} of ₹${budgetTarget.revised_goal.toLocaleString('en-IN')}
+- **PROJECTION (ASSUMPTION: Constant Channel CAC):** Deploying remaining ₹${remainingBudget.toLocaleString('en-IN')} across scalable channels projects **${forecast.projectedAttendees.toLocaleString('en-IN')} attendees** (+${forecast.projectedIncremental} incremental${forecast.capacityCapped ? `, capped at ${forecast.capacityCeiling.toLocaleString('en-IN')} venue ceiling` : ''}, projected CAC **₹${forecast.projectedBlendedCac}**).`;
   }
 
-  // 9. Recommendations / What should we scale or stop?
-  if (query.includes('recommend') || query.includes('what should we do') || query.includes('scale') || query.includes('stop') || query.includes('strategy') || query.includes('bets')) {
-    const scaleList = campaigns.filter(c => c.recommendation === 'scale' && c.spend_inr > 0).map(c => `${c.name} (CAC ₹${c.cac_inr})`).join(', ');
-    const stopList = campaigns.filter(c => c.recommendation === 'stop').map(c => `${c.name} (CAC ₹${c.cac_inr})`).join(', ');
-    
-    return `**Strategic Recommendations Based on Unit Economics:**
-1. **DOUBLE DOWN (SCALE):** ${scaleList}. These channels deliver verified students at sub-₹110 CAC with >80% show-up rates.
-2. **KILL / CUT (STOP):** ${stopList}. Paid Social (₹274 CAC, 240 no-shows) and Creator Partners (₹337 CAC).
-3. **REALLOCATION ACTION:** Shift ₹28,000 out of Paid Social directly into the Campus Ambassador network and WhatsApp Squad passes. This produces +190 incremental attendees to exceed our 2,200 goal.`;
+  // 9. Budget & Spend Overview
+  if (query.includes('budget') || query.includes('spend') || query.includes('money') || query.includes('cost') || query.includes('cac')) {
+    return `**Live Budget & Unit Economics (ACTUALS):**
+- **Total Spend:** ₹${totalSpend.toLocaleString('en-IN')} / ₹${budgetTarget.revised_goal.toLocaleString('en-IN')} (${analytics.budgetUtilizationPct}% utilized, ₹${remainingBudget.toLocaleString('en-IN')} remaining)
+- **Blended CAC (All):** ₹${totalSpend.toLocaleString('en-IN')} / ${totalAttendees} = **₹${blendedCac}**
+- **Paid Blended CAC (Excl. Walk-ins):** ₹${totalSpend.toLocaleString('en-IN')} / ${analytics.paidAttendees} = **₹${analytics.paidBlendedCac}**
+- **Stretch Target CAC:** ₹${budgetTarget.stretch_value.toLocaleString('en-IN')} / ${attendeesTarget.stretch_value.toLocaleString('en-IN')} = **₹${stretchCac}**`;
   }
 
-  // 10. Bottlenecks & Dropout Questions
-  if (query.includes('bottleneck') || query.includes('dropout') || query.includes('leak') || query.includes('no-show') || query.includes('noshow') || query.includes('conversion')) {
-    const noShows = campaigns.reduce((s, c) => s + (c.noshow_count || 0), 0);
-    const cancels = campaigns.reduce((s, c) => s + (c.cancel_count || 0), 0);
-    return `**Growth Funnel Bottlenecks:**
-1. **The Show-Up Cliff:** 3,120 students confirmed attendance, but only ${totalAttendees} checked in at the gate. That is a **${(100 - Number(overallShowup)).toFixed(1)}% dropout rate** (${noShows} no-shows and ${cancels} cancellations).
-2. **Paid Social Leak:** Paid Social alone accounted for 240 no-shows (41% show-up failure).
-3. **Fix:** Deploy automated WhatsApp/SMS reminders at T-7, T-3, and T-1 days with dynamic QR fast-track entry. Expected to recover +146 attendees.`;
+  // 10. Bottlenecks & No-Shows
+  if (query.includes('bottleneck') || query.includes('dropout') || query.includes('leak') || query.includes('no-show') || query.includes('noshow') || query.includes('show-up') || query.includes('conversion')) {
+    return `**Live Funnel Bottlenecks (ACTUALS):**
+- **Confirmed → Admitted:** ${totalConfirmed.toLocaleString('en-IN')} confirmed vs ${analytics.paidAttendees.toLocaleString('en-IN')} paid admitted (**${avgShowupRate}%** show-up; **${analytics.totalNoShows} no-shows**, ${analytics.totalCancels} cancellations).
+- **Lowest Show-up Channel:** ${worstShowupCampaign ? `${worstShowupCampaign.campaign.name} at **${worstShowupCampaign.showupRate}%** (${worstShowupCampaign.noShows} no-shows)` : 'N/A'}.
+- **Reg Starts → Registrations:** ${totalRegistrations.toLocaleString('en-IN')} / ${analytics.totalRegStarts.toLocaleString('en-IN')} (**${analytics.totalRegStarts > 0 ? ((totalRegistrations / analytics.totalRegStarts) * 100).toFixed(1) : 0}%**).`;
   }
 
-  // 11. Bangalore Market Sizing & City Justification
-  if (query.includes('bangalore') || query.includes('bengaluru') || query.includes('city') || query.includes('market size') || query.includes('audience')) {
-    return `**Tier 1 City Justification (Bangalore):**
-- **Student Population:** **5.38 Lakh** college students across **1,148 colleges** (AISHE & Karnataka Higher Education Council).
-- **Core Academic Clusters:**
-  1. *Central Cultural Corridor (Christ, St. Joseph's, Jain, Mount Carmel)*: High cultural society participation and disposable spend.
-  2. *Tech Campuses (PES, BMSCE, RVCE, Ramaiah, Dayananda Sagar)*: High participation in collegiate tech challenges.
-- **Transit Advantage:** Namma Metro Purple & Green lines connect 82% of target colleges to the festival venue within 40 minutes.`;
+  // 11. General Recommendations
+  if (query.includes('recommend') || query.includes('what should we do') || query.includes('scale') || query.includes('stop') || query.includes('strategy')) {
+    const scaleList = analytics.campaignMetrics
+      .filter(m => m.thresholdRecommendation === 'scale' && m.campaign.spend_inr > 0)
+      .map(m => `${m.campaign.name} (₹${m.cac})`)
+      .join(', ');
+    const stopList = analytics.campaignMetrics
+      .filter(m => m.thresholdRecommendation === 'stop')
+      .map(m => `${m.campaign.name} (₹${m.cac})`)
+      .join(', ');
+    return `**Live Recommendations (Rule-Based):**
+- **SCALE (CAC < ₹120 & Show-up ≥ 75%):** ${scaleList || 'None'}
+- **STOP (CAC > ₹220 or Show-up < 60%):** ${stopList || 'None'}
+${reallocationSuggestion ? `- **REALLOCATE:** Shift ₹${reallocationSuggestion.suggestedShiftAmount.toLocaleString('en-IN')} from ${reallocationSuggestion.fromCampaign.campaign.name} to ${reallocationSuggestion.toCampaigns.map(c => c.campaign.name).join(' & ')} for net **+${reallocationSuggestion.netAttendeeGain} attendees**.` : ''}`;
   }
 
-  // 12. Rudra Gupta / Candidate Information
-  if (query.includes('rudra') || query.includes('candidate') || query.includes('author') || query.includes('who are you') || query.includes('apm')) {
-    return `I am the **RISA Festival Growth AI Copilot**, built for **Rudra Gupta's APM Challenge A (Attendee Growth)**. 
-My role is to analyze real-time campaign performance, model CAC economics, identify funnel leaks, and convert data insights into actionable growth tasks.`;
-  }
-
-  // 12b. Website Navigation & Tab Guide
-  if (query.includes('navigate') || query.includes('each tab') || query.includes('tabs') || query.includes('how to use') || query.includes('how do i use') || query.includes('guide') || query.includes('walkthrough') || query.includes('what does this website')) {
-    return `Here is a quick guide to navigating the **RISA Growth Dashboard**:
-1. **DASHBOARD (Sidebar Tab 1):** Your command overview—tracks Admitted Attendees (vs 2,200 goal), Blended CAC, Budget Utilization, the Pre-Event Funnel Trajectory chart (leading to Event Day **20 Apr 2025**), and 3 bottom audit widgets.
-2. **DIAGNOSIS (Sidebar Tab 2):** Compares all 8 channels side by side. Click **Edit** on any campaign to change its spend or attendees and watch CAC and Dashboard KPIs recalculate live.
-3. **TASK BOARD (Sidebar Tab 3):** Tracks action items, owners, priorities, and status (**open / in_progress / done**). Any task I suggest here is added there when you click **Confirm & Add**.
-4. **Floating AI COPILOT (Bottom-Right Pill):** Click **Ask AI Copilot** anytime (and use the expand icon to enlarge) to diagnose channels, run reallocation math, or create tasks without leaving your current tab.
-5. **RESET 2025 DATA & Top Bar:** Use **RESET 2025 DATA** in the sidebar to undo edits, or click **Download Presentation (.pptx)** in the top bar for the slide deck.`;
-  }
-
-  // 13. Dynamic Comparisons (e.g. "compare Paid Social and Campus Ambassadors")
+  // 12. Dynamic Comparisons
   if (query.includes('vs') || query.includes('compare')) {
-    const c1 = campaigns.find(c => query.includes(c.name.toLowerCase())) || campaigns[0];
-    const c2 = campaigns.find(c => query.includes(c.name.toLowerCase()) && c.id !== c1.id) || campaigns[1];
-    
-    const c1Cac = c1.cac_inr ?? (c1.attendees > 0 ? Math.round(c1.spend_inr / c1.attendees) : 0);
-    const c2Cac = c2.cac_inr ?? (c2.attendees > 0 ? Math.round(c2.spend_inr / c2.attendees) : 0);
-    
-    return `**Comparison: ${c1.name} vs ${c2.name}:**
-- **${c1.name}:** Spend ₹${c1.spend_inr.toLocaleString('en-IN')} | Attendees: ${c1.attendees} | CAC: **₹${c1Cac}** | Show-up: **${c1.showup_rate}%** (${c1.recommendation.toUpperCase()})
-- **${c2.name}:** Spend ₹${c2.spend_inr.toLocaleString('en-IN')} | Attendees: ${c2.attendees} | CAC: **₹${c2Cac}** | Show-up: **${c2.showup_rate}%** (${c2.recommendation.toUpperCase()})
-- **Verdict:** ${c1Cac < c2Cac ? c1.name : c2.name} is **${Math.abs(c1Cac - c2Cac)} INR cheaper per attendee** with better show-up commitment.`;
+    const matches = analytics.campaignMetrics.filter(m => query.includes(m.campaign.name.toLowerCase()));
+    const c1 = matches[0] || analytics.byCacAsc[0];
+    const c2 = matches[1] || analytics.byCacDesc[0];
+    if (c1 && c2) {
+      const cheaper = c1.cac <= c2.cac ? c1 : c2;
+      return `**Live Comparison: ${c1.campaign.name} vs ${c2.campaign.name}**
+- **${c1.campaign.name}:** Spend ₹${c1.campaign.spend_inr.toLocaleString('en-IN')} | Attendees ${c1.campaign.attendees} | CAC **₹${c1.cac}** | Show-up **${c1.showupRate}%**
+- **${c2.campaign.name}:** Spend ₹${c2.campaign.spend_inr.toLocaleString('en-IN')} | Attendees ${c2.campaign.attendees} | CAC **₹${c2.cac}** | Show-up **${c2.showupRate}%**
+- **Verdict:** ${cheaper.campaign.name} is **₹${Math.abs(c1.cac - c2.cac)} cheaper per attendee**.`;
+    }
   }
 
-  // 14. Intelligent Context-Aware Fallback Summary (No robotic repetition)
-  return `Here is a summary of our current festival growth position:
-- **Admitted Attendees:** ${totalAttendees.toLocaleString('en-IN')} / ${attendeeTargetObj.revised_goal.toLocaleString('en-IN')} target (${((totalAttendees / attendeeTargetObj.revised_goal) * 100).toFixed(1)}% to goal)
-- **Total Spend:** ₹${totalSpend.toLocaleString('en-IN')} of ₹${budgetTargetObj.revised_goal.toLocaleString('en-IN')} budget
-- **Blended CAC:** **₹${blendedCac}** per admitted attendee
-- **Best Channel:** ${bestCacCampaign.name} (CAC ₹${bestCacCampaign.cac_inr}, Show-up ${bestCacCampaign.showup_rate}%)
-- **Primary Bottleneck:** Paid Social has a CAC of ₹${worstCacCampaign.cac_inr} with 240 no-shows.
+  // 13. Website Navigation Guide
+  if (query.includes('navigate') || query.includes('tabs') || query.includes('how to use') || query.includes('guide')) {
+    return `**Dashboard Navigation:**
+1. **DASHBOARD:** Live KPIs (Actuals), Campaign-level Forecast (Projections), Funnel Stages, Constraints, and What-If Simulator.
+2. **DIAGNOSIS:** Edit any campaign's spend/attendees and see live CAC, Show-up %, and Threshold alerts.
+3. **TASK BOARD:** Manage growth tasks; AI-proposed tasks appear here only after you click **Confirm & Add**.`;
+  }
 
-You can ask me to diagnose any channel (e.g. *"Diagnose Creator Partners"*), compare channels (*"Compare Paid Social and Referrals"*), explain bottlenecks (*"Where are we losing attendees?"*), or create tasks (*"Create a task to cut Creator Partners"*).`;
+  // 14. Unfamiliar / Unrecognized Question — explicitly acknowledge limitation instead of guessing
+  return `I couldn't match **"${userMessage}"** to a specific metric in the RISA 2025 dataset. I only answer from verified live data and don't guess missing information. You can ask me about:
+- Lowest or highest CAC campaigns (e.g. *"Which campaign has the lowest CAC?"*)
+- Why a channel is underperforming (e.g. *"Why is Paid Social underperforming?"*)
+- Budget reallocation or target forecasts (e.g. *"Recommend a budget reallocation"*)
+- Creating an action task with confirmation (e.g. *"Create a task to cut Creator Partners"*)`;
 };
 
 export interface ChatReply {
@@ -390,16 +462,16 @@ export interface ChatReply {
   thought?: string;
 }
 
-// Send message to Supabase Edge Function (secure, hides Gemini key) -> Direct Gemini -> Fallback
 export const sendChatMessage = async (
   messages: ChatMessage[],
   campaigns: Campaign[],
   targets: Target[],
-  sessionId: string
+  sessionId: string,
+  dailyMetrics: DailyMetric[] = []
 ): Promise<ChatReply> => {
   const { url, anonKey, geminiKey } = getStoredConfig();
 
-  // 1. Try Supabase Edge Function first (keeps GEMINI_API_KEY 100% hidden on server)
+  // 1. Try Supabase Edge Function first
   if (url && anonKey) {
     try {
       const edgeUrl = `${url.replace(/\/$/, '')}/functions/v1/chat-handler`;
@@ -409,14 +481,15 @@ export const sendChatMessage = async (
           'Content-Type': 'application/json',
           'apikey': anonKey,
           'Authorization': `Bearer ${anonKey}`,
-          ...(geminiKey ? { 'x-gemini-key': geminiKey } : {})
+          ...(geminiKey ? { 'x-gemini-key': geminiKey } : {}),
         },
         body: JSON.stringify({
           messages,
           session_id: sessionId,
           campaigns,
-          targets
-        })
+          targets,
+          dailyMetrics,
+        }),
       });
 
       if (res.ok) {
@@ -430,49 +503,47 @@ export const sendChatMessage = async (
 
   // 2. Try direct Google Gemini API if Gemini API Key is provided locally
   if (geminiKey) {
-    try {
-      const systemInstruction = buildSystemPrompt(campaigns, targets);
-      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`;
+    const systemInstruction = buildSystemPrompt(campaigns, targets, dailyMetrics);
+    const rawContents = messages.map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    }));
+    const firstUserIdx = rawContents.findIndex(c => c.role === 'user');
+    const contents = firstUserIdx >= 0 ? rawContents.slice(firstUserIdx) : rawContents;
 
-      const contents = messages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }]
-      }));
+    for (const model of ['gemini-2.5-flash', 'gemini-3-flash-preview']) {
+      try {
+        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        const res = await fetch(geminiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemInstruction }] },
+            contents,
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 1800,
+              thinkingConfig: { thinkingBudget: 1024, includeThoughts: true },
+            },
+          }),
+        });
 
-      const payload = {
-        system_instruction: {
-          parts: [{ text: systemInstruction }]
-        },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1800,
-          thinkingConfig: {
-            thinkingBudget: 1024,
-            includeThoughts: true
-          }
+        if (res.ok) {
+          const data = await res.json();
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          const thoughtText = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('\n').trim();
+          const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('').trim();
+          if (replyText) return { reply: replyText, thought: thoughtText || undefined };
         }
-      };
-
-      const res = await fetch(geminiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const thoughtText = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('\n').trim();
-        const replyText = parts.filter((p: any) => !p.thought && p.text).map((p: any) => p.text).join('').trim();
-        if (replyText) return { reply: replyText, thought: thoughtText || undefined };
+      } catch (e) {
+        console.warn(`Direct Gemini API (${model}) failed:`, e);
       }
-    } catch (e) {
-      console.warn('Direct Gemini API call failed, using built-in engine:', e);
     }
   }
 
-  // 3. Built-in Deterministic Engine with exact system prompt rules
+  // 3. Deterministic TypeScript Engine (with full conversation history + live data)
   const lastUserMsg = messages.filter(m => m.role === 'user').pop()?.content || '';
-  return { reply: fallbackChatEngine(lastUserMsg, campaigns, targets) };
+  return {
+    reply: fallbackChatEngine(lastUserMsg, campaigns, targets, messages.slice(0, -1), dailyMetrics),
+  };
 };

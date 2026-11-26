@@ -10,8 +10,8 @@ import { DiagnosisTab } from './tabs/DiagnosisTab';
 import { TasksTab } from './tabs/TasksTab';
 import { ChatbotTab } from './tabs/ChatbotTab';
 import { Campaign, Target, DailyMetric, Task } from './types';
-import { api } from './services/supabase';
-import { Search, ChevronRight, Menu, Download, Presentation } from 'lucide-react';
+import { api, StorageStatus, subscribeStorageStatus } from './services/supabase';
+import { Search, ChevronRight, Menu, Presentation } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -32,6 +32,11 @@ export const App: React.FC = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus>({ mode: 'local', lastError: null });
+
+  useEffect(() => {
+    return subscribeStorageStatus(setStorageStatus);
+  }, []);
 
   // Set page title
   useEffect(() => {
@@ -69,10 +74,12 @@ export const App: React.FC = () => {
   // Update a campaign spend/recommendation (Live recompute across app)
   const handleUpdateCampaign = async (id: number, updates: Partial<Campaign>) => {
     try {
-      const updatedCampaigns = await api.updateCampaign(id, updates);
+      const { campaigns: updatedCampaigns, persistedTo } = await api.updateCampaign(id, updates);
       setCampaigns(updatedCampaigns);
       setLastUpdated(new Date());
-      setToastMessage('Campaign updated — metrics recomputed live!');
+      setToastMessage(
+        `Campaign updated (${persistedTo === 'supabase' ? 'saved to Supabase' : 'saved to local storage'}) — metrics recomputed live!`
+      );
     } catch (err: any) {
       console.error('Update campaign error:', err);
       setToastMessage('Failed to update campaign');
@@ -87,11 +94,12 @@ export const App: React.FC = () => {
         api.resetCampaigns(),
         api.resetTargets()
       ]);
-      setCampaigns(resetC);
-      setTargets(resetT);
+      setCampaigns(resetC.campaigns);
+      setTargets(resetT.targets);
       setLastUpdated(new Date());
       setIsResetModalOpen(false);
-      setToastMessage('Data & constraints reset to original 2025 values.');
+      const dest = resetC.persistedTo === 'supabase' ? 'Supabase & local storage' : 'local storage';
+      setToastMessage(`Data & constraints reset to original 2025 values (${dest}).`);
     } catch (err: any) {
       console.error('Reset error:', err);
       setToastMessage('Failed to reset data');
@@ -103,10 +111,12 @@ export const App: React.FC = () => {
   // Update target constraints (Budget / Attendee Goal)
   const handleUpdateTarget = async (metric: string, revisedGoal: number) => {
     try {
-      const updated = await api.updateTarget(metric, revisedGoal);
+      const { targets: updated, persistedTo } = await api.updateTarget(metric, revisedGoal);
       setTargets(updated);
       setLastUpdated(new Date());
-      setToastMessage('Constraint updated — dashboard & Copilot synced!');
+      setToastMessage(
+        `Constraint updated (${persistedTo === 'supabase' ? 'Supabase' : 'local storage'}) — dashboard & Copilot synced!`
+      );
     } catch (err: any) {
       console.error('Update target error:', err);
       setToastMessage('Failed to update constraint');
@@ -124,10 +134,16 @@ export const App: React.FC = () => {
   ) => {
     try {
       await api.updateCampaign(fromId, { spend_inr: fromNewSpend, attendees: fromNewAttendees, recommendation: 'stop' });
-      const updated = await api.updateCampaign(toId, { spend_inr: toNewSpend, attendees: toNewAttendees, recommendation: 'scale' });
+      const { campaigns: updated, persistedTo } = await api.updateCampaign(toId, {
+        spend_inr: toNewSpend,
+        attendees: toNewAttendees,
+        recommendation: 'scale',
+      });
       setCampaigns(updated);
       setLastUpdated(new Date());
-      setToastMessage('Budget reallocation applied live!');
+      setToastMessage(
+        `Budget reallocation applied (${persistedTo === 'supabase' ? 'saved to Supabase' : 'saved to local storage'})!`
+      );
     } catch (err: any) {
       console.error('Reallocation error:', err);
       setToastMessage('Failed to apply reallocation');
@@ -137,9 +153,9 @@ export const App: React.FC = () => {
   // Create Task
   const handleCreateTask = async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const created = await api.createTask(task);
+      const { task: created, persistedTo } = await api.createTask(task);
       setTasks(prev => [created, ...prev]);
-      setToastMessage('Task added successfully!');
+      setToastMessage(`Task added (${persistedTo === 'supabase' ? 'Supabase' : 'local storage'})!`);
     } catch (err: any) {
       console.error('Create task error:', err);
       setToastMessage('Failed to add task');
@@ -149,7 +165,7 @@ export const App: React.FC = () => {
   // Update Task
   const handleUpdateTask = async (id: number, updates: Partial<Task>) => {
     try {
-      const updatedTasks = await api.updateTask(id, updates);
+      const { tasks: updatedTasks } = await api.updateTask(id, updates);
       setTasks(updatedTasks);
     } catch (err: any) {
       console.error('Update task error:', err);
@@ -159,9 +175,9 @@ export const App: React.FC = () => {
   // Delete Task
   const handleDeleteTask = async (id: number) => {
     try {
-      const remainingTasks = await api.deleteTask(id);
+      const { tasks: remainingTasks, persistedTo } = await api.deleteTask(id);
       setTasks(remainingTasks);
-      setToastMessage('Task removed');
+      setToastMessage(`Task removed (${persistedTo === 'supabase' ? 'Supabase' : 'local storage'})`);
     } catch (err: any) {
       console.error('Delete task error:', err);
     }
@@ -177,6 +193,7 @@ export const App: React.FC = () => {
         onOpenResetModal={() => setIsResetModalOpen(true)}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        storageStatus={storageStatus}
       />
 
       {/* Main Content Area */}
@@ -278,6 +295,7 @@ export const App: React.FC = () => {
             <ChatbotTab
               campaigns={campaigns}
               targets={targets}
+              dailyMetrics={dailyMetrics}
               onTaskCreated={handleCreateTask}
               onShowToast={msg => setToastMessage(msg)}
             />
@@ -307,6 +325,7 @@ export const App: React.FC = () => {
       <FloatingCopilot
         campaigns={campaigns}
         targets={targets}
+        dailyMetrics={dailyMetrics}
         onTaskCreated={handleCreateTask}
         onShowToast={msg => setToastMessage(msg)}
         hidden={activeTab === 'chatbot'}
