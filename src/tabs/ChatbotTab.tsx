@@ -227,35 +227,35 @@ export const ChatbotTab: React.FC<ChatbotTabProps> = ({
       }`}
     >
       {/* Disclaimer Header */}
-      <div className="p-3.5 bg-[#1C0E0C] border-b border-[#3E201B] flex items-center justify-between text-xs text-[#C4ABA1]">
-        <div className="flex items-center gap-2 min-w-0">
-          <HelpCircle className="w-4 h-4 text-[#F6C445] shrink-0" />
+      <div className="px-3.5 py-2 bg-[#1C0E0C] border-b border-[#3E201B] flex items-center justify-between text-[11px] text-[#C4ABA1]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <HelpCircle className="w-3.5 h-3.5 text-[#F6C445] shrink-0" />
           <span className="truncate">
             {isFloating ? 'Live 2025 festival data' : 'Answers strictly based on live 2025 festival data. Unanswerable questions are flagged.'}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-[11px] text-[#34D399] font-black uppercase">● Gemini 2.5 Thinking</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="hidden sm:inline text-[10px] text-[#34D399] font-black uppercase">● Live AI</span>
           <button
             onClick={handleNewChat}
-            className="text-[11px] bg-[#2B1613] hover:bg-[#381D19] text-[#F6C445] border border-[#3E201B] px-3 py-1 rounded-full font-bold transition-colors"
+            className="text-[10px] bg-[#2B1613] hover:bg-[#381D19] text-[#F6C445] border border-[#3E201B] px-2.5 py-0.5 rounded-full font-bold transition-colors"
           >
             New Chat
           </button>
         </div>
       </div>
 
-      {/* Suggestion Chips (Rounded-full) */}
-      <div className="p-3 bg-[#221210] border-b border-[#3E201B] flex flex-wrap gap-2">
+      {/* Compact Single-Row Suggestion Chips */}
+      <div className="px-3 py-2 bg-[#221210] border-b border-[#3E201B] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         {suggestionChips.map((chip, idx) => (
           <button
             key={idx}
             onClick={() => handleSend(chip)}
             disabled={loading}
-            className="text-xs bg-[#2B1613] hover:bg-[#381D19] text-[#FFFFFF] border border-[#3E201B] hover:border-[#F6C445] px-4 py-1.5 rounded-full transition-colors flex items-center gap-1.5 font-bold shadow-sm"
+            className="text-[10px] whitespace-nowrap shrink-0 bg-[#2B1613] hover:bg-[#381D19] text-[#FFFFFF] border border-[#3E201B] hover:border-[#F6C445] px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 font-bold"
           >
-            <Sparkles className="w-3 h-3 text-[#F6C445]" />
-            {chip}
+            <Sparkles className="w-2.5 h-2.5 text-[#F6C445] shrink-0" />
+            <span>{chip}</span>
           </button>
         ))}
       </div>
