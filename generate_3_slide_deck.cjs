@@ -90,7 +90,7 @@ async function buildThreeSlideDeck() {
       x: 0.75, y: 1.48, w: 2.1, h: 0.75,
       fontFace: FONT, fontSize: 40, bold: true, color: C.darkText, valign: 'middle'
     });
-    slide.addText('Admitted Attendees\n₹124.5 CAC (₹2.74L ÷ 2,200)\n76.5%+ Paid Show-Up', {
+    slide.addText('Admitted Attendees\n₹124.5 CAC (₹2.74L ÷ 2,200)\n82.2% Paid Show-Up', {
       x: 2.75, y: 1.52, w: 1.8, h: 0.75,
       fontFace: FONT, fontSize: 8.5, bold: true, color: C.darkText, valign: 'middle', lineSpacing: 13
     });
