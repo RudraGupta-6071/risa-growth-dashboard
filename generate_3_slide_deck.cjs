@@ -101,7 +101,7 @@ async function buildThreeSlideDeck() {
 
     // Two Sub-Scenario Cards (Base & Stretch)
     const subTargets = [
-      { label: 'REALISTIC BASE', num: '2,050', detail: '₹133.7 CAC\n66.8% Show-Up\n₹2.74L Spend' },
+      { label: 'REALISTIC BASE', num: '2,050', detail: '₹134 CAC\n76.2% Paid Show-Up\n₹2.74L Spend' },
       { label: 'STRETCH CEILING', num: '2,500', detail: '₹120 CAC\n83.3% Show-Up\n₹3.00L Budget' }
     ];
     subTargets.forEach((st, idx) => {
@@ -146,8 +146,8 @@ async function buildThreeSlideDeck() {
     slide.addChart(pres.ChartType.bar, [
       {
         name: 'Students',
-        labels: ['Reach', 'Reg Starts', 'Confirmed', 'Admitted', 'Goal'],
-        values: [45000, 3850, 3120, 2050, 2200]
+        labels: ['Reg Starts', 'Registrations', 'Confirmed', 'Admitted', 'Goal'],
+        values: [3630, 2626, 2525, 2050, 2200]
       }
     ], {
       x: 5.05, y: 1.25, w: 4.28, h: 2.7,
@@ -173,11 +173,11 @@ async function buildThreeSlideDeck() {
       x: 4.92, y: 4.2, w: 4.53, h: 0.92,
       rectRadius: 0.14, fill: { color: '2B1412' }, line: { color: C.gold, width: 1 }
     });
-    slide.addText('34.3% SHOW-UP LEAK & VENUE CAPACITY', {
+    slide.addText('23.8% PAID NO-SHOW LEAK & VENUE CAPACITY', {
       x: 5.08, y: 4.28, w: 4.2, h: 0.2,
       fontFace: FONT, fontSize: 8, bold: true, color: C.gold
     });
-    slide.addText('1,070 confirmed sign-ups never checked in. Staggering entry across two waves (1,100 morning, 1,400 evening) fits 2,200+ under our 2,500 cap.', {
+    slide.addText('600 confirmed sign-ups never checked in (2,525 confirmed vs 1,925 paid admitted). Staggering entry across two waves (1,100 + 1,400) fits 2,200+ under our 2,500 cap.', {
       x: 5.08, y: 4.48, w: 4.22, h: 0.56,
       fontFace: FONT, fontSize: 8, color: C.white, lineSpacing: 11.5
     });

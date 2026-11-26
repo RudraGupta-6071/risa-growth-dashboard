@@ -1,136 +1,161 @@
-# RISA Festival '25 — Attendee Growth Command Center & Strategy
-**Candidate**: Rudra Gupta · APM Candidate · Challenge A: Attendee Growth · Tier 1 Bangalore  
-**Live Application URL**: [https://rudragupta-6071.github.io/risa-growth-dashboard/](https://rudragupta-6071.github.io/risa-growth-dashboard/)  
-**GitHub Repository**: [https://github.com/RudraGupta-6071/risa-growth-dashboard](https://github.com/RudraGupta-6071/risa-growth-dashboard)  
-**Slide Presentations**:
-- [**3-Slide Strategy Deck (.pptx)**](RISA_3_Slide_Strategy_Deck.pptx) — *Strictly formatted for the 3-slide PDF requirement*
-- [**Comprehensive 8-Slide Executive Deck (.pptx)**](RISA_Growth_APM_Presentation.pptx) — *Full visual deck with deep dives & simulations*
+# RISA Festival '25 — Attendee Growth Strategy & Command Center
+
+**Candidate:** Rudra Gupta  
+**Track:** Challenge A — Attendee Growth (Tier 1 City: Bengaluru Urban)  
+**Live Application:** https://rudragupta-6071.github.io/risa-growth-dashboard/  
+**GitHub Repository:** https://github.com/RudraGupta-6071/risa-growth-dashboard  
+**3-Slide Strategy Deck (PDF):** [`RISA_3_Slide_Strategy_Deck.pdf`](RISA_3_Slide_Strategy_Deck.pdf)  
+**3-Slide Strategy Deck (PPTX):** [`RISA_3_Slide_Strategy_Deck.pptx`](RISA_3_Slide_Strategy_Deck.pptx)  
 
 ---
 
-## 📑 Complete Submission Deliverables Summary
+## 1. Submission Deliverables
 
-| Deliverable | Format | Access / Location | Description |
+| Deliverable | Format | Location | Purpose |
 | :--- | :--- | :--- | :--- |
-| **1. Growth Strategy Deck (Core 3 Slides)** | `.pptx` / PDF-ready | [`RISA_3_Slide_Strategy_Deck.pptx`](RISA_3_Slide_Strategy_Deck.pptx) | Strictly answers Slide 1 (*How High Can You Aim?*), Slide 2 (*Where Will You Place Your Bets?*), and Slide 3 (*How Will You Know What's Working?*). Includes candidate name on Slide 1. |
-| **2. Extended Executive Presentation** | `.pptx` | [`RISA_Growth_APM_Presentation.pptx`](RISA_Growth_APM_Presentation.pptx) | 8-slide visual deck with native PPT charts, Bangalore market sizing doughnut chart, channel CAC comparison, and budget run-rate simulations. |
-| **3. Working Live Product** | Web Application | [Live Hosted URL](https://rudragupta-6071.github.io/risa-growth-dashboard/) | Functional single-page web application featuring live funnel metrics, editable campaign table with instant CAC recalculation, task management orchestration, and embedded AI Copilot. |
-| **4. Comprehensive README** | Markdown | [`README.md`](README.md) | In-depth documentation covering market research, quantitative formulas, ICE prioritization framework, architecture, tools used, and known limitations. |
+| Three-Slide Growth Strategy | PDF / PPTX | [`RISA_3_Slide_Strategy_Deck.pdf`](RISA_3_Slide_Strategy_Deck.pdf) | Covers Slide 1 (How High Can You Aim?), Slide 2 (Where Will You Place Your Bets?), and Slide 3 (How Will You Know What's Working?). Candidate name included on Slide 1. |
+| Working Growth Center | React + TypeScript Web App | https://rudragupta-6071.github.io/risa-growth-dashboard/ | Live analytics dashboard, editable campaign diagnosis table, operational task board, what-if budget simulator, and grounded AI Copilot. |
+| Documentation | Markdown | [`README.md`](README.md) | Research, assumptions, calculations, data reconciliation, prioritization framework, setup instructions, tools used, and known limitations. |
 
 ---
 
-## 🏛️ Section 1: Research & Tier 1 City Justification (Bengaluru Urban)
+## 2. Tier 1 City Selection & Market Research (Bengaluru Urban)
 
-### Why Bangalore?
-1. **Unrivaled College Density**: Bengaluru Urban hosts **1,148 colleges** with a total student population of approximately **5.38 Lakh** (source: Karnataka State Higher Education Council & AISHE).
-2. **Transit Connectivity**: The expansion of Namma Metro's **Purple and Green lines** and the Majestic interchange provides direct, traffic-free transit connectivity to over 80% of major academic institutions within a 40-minute commute.
-3. **High Disposable Discretionary Spend**: Bangalore undergraduate students have the highest average discretionary event spend among South Indian metros, driven by thriving tech culture and active collegiate societies.
-4. **Target Clusters Identified**:
-   - **Cluster 1: South-Central Cultural Core**: Christ University, St. Joseph's, Jain University, Mount Carmel (High participation in cultural showcases).
-   - **Cluster 2: South & West Tech Hubs**: PES University, BMSCE, RVCE, Dayananda Sagar, Ramaiah (High volume for hackathons and competitive collegiate stages).
+### Why Bengaluru?
+1. **Campus Density:** Bengaluru Urban hosts **1,148 colleges** with approximately **5.38 Lakh** college students, creating concentrated campus clusters for peer-driven event discovery.
+2. **Transit Connectivity:** Namma Metro's **Purple and Green lines** (via the Majestic interchange) connect roughly **82% of priority campuses** within a 40-minute commute, reducing traffic-induced event-day attrition.
+3. **Target Audience Clusters:**
+   - **Cluster 1 — South-Central Cultural Core** (Christ University, St. Joseph's, Jain University, Mount Carmel): High density of cultural, dance, music, and debate societies.
+   - **Cluster 2 — South & West Tech Hubs** (PES University, BMSCE, RVCE, Dayananda Sagar, Ramaiah): High commuter volume along metro corridors with strong affinity for inter-collegiate competitions and live showcases.
 
 ---
 
-## 📐 Section 2: Quantitative Funnel Model & Calculations
+## 3. Data Reconciliation, Assumptions & Quantitative Model
 
-### Funnel Metrics & Formulae
-The growth engine is modeled through a 4-tier conversion waterfall:
-$$\text{Admitted Attendees} = \text{Reach} \times \text{CR}_{\text{reg}} \times \text{CR}_{\text{conf}} \times \text{Show-up Rate}$$
+### Core Formulas
+All dashboard KPIs and AI Copilot metrics are computed deterministically in TypeScript (`src/services/analytics.ts`):
 
-$$\text{Blended CAC} = \frac{\sum \text{Campaign Spend}}{\sum \text{Admitted Attendees}}$$
+- **Blended CAC (All Admitted):** `total_spend / total_attendees`
+- **Paid Blended CAC (Excl. Walk-ins):** `total_spend / (total_attendees - walk_in_attendees)`
+- **Campaign CAC:** `campaign_spend / campaign_attendees`
+- **Stretch CAC:** `stretch_budget / stretch_attendees = 3,00,000 / 2,500 = INR 120`
+- **Show-up Rate (Paid Channels):** `paid_admitted / confirmed_registrations * 100`
+- **Reg-Start Conversion:** `registrations / reg_starts * 100`
 
-$$\text{Show-up Rate} = \frac{\text{Admitted Attendees}}{\text{Confirmed Registrations}} \times 100$$
+### Baseline Data Reconciliation (Campaigns vs. Daily Historical Rollup)
+The historical `daily_metrics` table ends on Event Day (`2025-04-20`) and is preserved read-only. Reconciling channel-level `campaigns` against `daily_metrics` yields:
 
-### Target Scenarios
+| Metric | Daily Historical (`2025-04-20`) | Campaign Sum (Baseline) | Variance / Explanation |
+| :--- | :--- | :--- | :--- |
+| Spend (INR) | 2,74,000 | 2,74,000 | 0 (Exact match) |
+| Admitted Attendees | 2,050 | 2,050 | 0 (Exact match; includes 125 walk-ins at INR 0 spend) |
+| Registrations | 2,800 | 2,626 | +174 unattributed / pre-campaign daily rollup variance |
+| Confirmed | 2,500 | 2,525 | -25 channel-level vs. daily rollup variance |
 
-| Scenario | Target Admitted | Budget Spend | Blended CAC | Show-Up Rate | Strategic Levers Required |
+### Target Scenarios & Capacity Constraints
+
+| Scenario | Admitted Target | Budget | Blended CAC | Paid Show-Up | Key Levers |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Realistic Base** | **2,050** | ₹2,74,000 | ₹133.7 | 66.8% | Baseline performance with original unoptimized channel spend. |
-| **Revised Target (Challenge Goal)** | **2,200** | ₹2,74,000 | **₹124.5** | **76.5%** | Reallocating ₹28K from Paid Social into Ambassadors and WhatsApp Referrals (+150 net attendees). |
-| **Ambitious Stretch** | **2,500** | ₹3,00,000 | **₹109.6** | **83.3%** | Deploying full ₹3.0L budget with Metro Purple Line shuttles and automated waitlist SMS recovery. |
+| Realistic Base (Actuals) | 2,050 (1,925 paid + 125 walk-ins) | INR 2,74,000 | INR 134 (INR 133.7 exact) | 76.2% (1,925 / 2,525) | Unoptimized baseline with high Paid Social & Creator spend. |
+| Revised Goal (Challenge) | 2,200 | INR 3,00,000 max (INR 2,74,000 reallocated) | INR 136 max (INR 124.5 at INR 2.74L) | 76.5%+ | Reallocate 30% of Paid Social spend into Ambassadors & Referrals. |
+| Ambitious Stretch | 2,500 | INR 3,00,000 | INR 120 | 83.3% | Full INR 3.00L deployment with Metro shuttles & waitlist SMS recovery. |
 
-### Capacity Constraints & Staggering
-- **Venue Ceiling**: Maximum safe simultaneous occupancy of **2,500 visitors**.
-- **Execution Staggering**: 
-  - Wave 1 (Morning / Competitions): 10:00 AM – 2:30 PM (Peak: 1,100 visitors).
-  - Wave 2 (Evening / Artist Showcases): 3:30 PM – 9:30 PM (Peak: 1,400 visitors).
+- **Venue Capacity Ceiling:** **2,500 simultaneous visitors**, managed via two staggered entry waves (Morning Wave: 1,100 peak; Evening Wave: 1,400 peak).
+- **Campaign-Level Forecast (`analytics.ts`):** Remaining budget (`max(0, budget_goal - total_spend)`) is allocated across scalable paid channels weighted inversely by live CAC (`1 / cac`), converted using each channel's live expected CAC, and capped at the `2,500` venue capacity ceiling.
+- **Actuals vs. Projections vs. Assumptions:** Dashboard cards explicitly label observed **ACTUAL** metrics, modeled **PROJECTION** figures, and **ASSUMPTION** (e.g., constant marginal CAC during reallocation).
 
 ---
 
-## 🎯 Section 3: Prioritization Framework (ICE Scoring)
+## 4. Prioritization Framework (ICE) & Strategy Deduplication
 
-Strategies were evaluated using the **ICE Framework** (Impact, Confidence, Ease scored 1–10):
+Strategies are ranked using **ICE** (Impact, Confidence, Ease on a 1–10 scale):
 
-| Rank & Strategy | Impact (1–10) | Confidence (1–10) | Ease (1–10) | ICE Score | Net Gain | Budget Allocated | Unit CAC |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **#1 Campus Ambassador Network** | 9 | 9 | 9 | **9.0** | +420 | ₹45,000 | ₹108 |
-| **#2 College Cultural Club Co-Hosting** | 9 | 8 | 9 | **8.7** | +385 | ₹31,000 | ₹81 |
-| **#3 WhatsApp Peer Referral & Squad Pass** | 8 | 9 | 8 | **8.3** | +310 | ₹21,500 | ₹69 |
-| **#4 High-Intent Waitlist SMS Recovery** | 7 | 8 | 8 | **7.7** | +210 | ₹15,000 | ₹71 |
-| **#5 Fast-Track QR Admission & Shuttles** | 7 | 7 | 7 | **7.0** | +150 | ₹12,500 | ₹83 |
+| Rank & Strategy | Impact | Confidence | Ease | ICE | Gross Gain | Budget | Unit CAC | Testing & Primary KPIs |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| 1. Campus Ambassador Network (35 reps) | 9 | 9 | 9 | 9.0 | +420 | INR 45,000 | INR 108 | Pilot 10 campuses Week 1; monitor 48h rep quota completion & WhatsApp link conversion. |
+| 2. College Cultural Club Co-Hosting | 9 | 8 | 9 | 8.7 | +385 | INR 31,000 | INR 81 | Pilot 10 clubs (>200 members); track contingent bus confirmations & 91.7% show-up rate. |
+| 3. WhatsApp Peer Referral (Squad Pass) | 8 | 9 | 8 | 8.3 | +310 | INR 21,500 | INR 69 | A/B test Buy-3-Get-1 vs. single pass; monitor viral coefficient `k` (target > 1.2). |
+| 4. High-Intent Waitlist SMS Recovery | 7 | 8 | 8 | 7.7 | +210 | INR 15,000 | INR 71 | 50/50 holdout on 730 unconfirmed dropouts in final 72h; target 25–28% recovery. |
+| 5. Metro Fast-Track QR & Shuttles | 7 | 7 | 7 | 7.0 | +150 | INR 12,500 | INR 83 | Continuous Purple Line shuttles + 6 scanner lanes; monitor gate wait time (< 5 min). |
 
-### The Tradeoff & Kill List
-- **Paid Social (Meta Ads)**: **CUT by 30% (-₹22.5K)**. High CAC (₹274) and massive no-show attrition (240 no-shows; 58.6% show-up).
-- **Creator Partnerships**: **FREEZE**. CAC of ₹337 (₹59,000 spent for only 175 attendees).
-- **Reallocation Payoff**: Shifting ₹28,000 into Campus Ambassadors (+110) and WhatsApp Referrals (+80) yields **+190 net attendees** at zero additional budget.
+### Overlap & Deduplication Reconciliation (+1,475 Gross vs. +450 Net Stretch)
+- **Gross Sum of 5 Strategies:** `+1,475` incremental attendees.
+- **Deduplication & Capacity Deduction:** `-1,025` (`69.5%`) removed for:
+  1. **Multi-touch overlap:** Students reached by Ambassadors or Clubs also use Squad Passes, SMS nudges, and Metro shuttles (deduplicated by unique check-in ID).
+  2. **Baseline overlap:** Portion of Ambassador and Club volume overlaps with existing baseline run-rate rather than purely net-new admissions.
+  3. **Budget & Venue Cap:** `INR 3,00,000` budget ceiling and `2,500` simultaneous venue capacity cap net lift at `+450` above the `2,050` base.
+
+### Explicit Tradeoffs (What We Cut)
+- **Paid Social (Meta Ads):** `INR 93,000` spend, `340` attendees, **INR 274 CAC**, `240` no-shows (`58.62%` show-up). Action: **Cut spend by 30%** and reallocate to lowest-CAC scalable channels.
+- **Creator Partners:** `INR 59,000` spend, `175` attendees, **INR 337 CAC**, `115` no-shows (`60.34%` show-up). Action: **Stop / Freeze** immediately.
 
 ---
 
-## 🚨 Section 4: Adaptive Decision Playbook
+## 5. Adaptive Decision Playbook
 
-| Action Tier | Quantitative Thresholds | Early Warning Signals | Tactical Team Response | AI Copilot Action |
+| Tier | Thresholds | Early Signals | Team Action | AI Copilot Role |
 | :--- | :--- | :--- | :--- | :--- |
-| **SCALE** | CAC $\le$ ₹120<br>Show-Up $\ge$ 80% | Club presidents booking bus contingents; Referral $k > 1.2$ | Release ₹15,000 ambassador bonus pool; issue extra promo kits. | Auto-proposes budget scale-up task ticket with 1-click confirmation. |
-| **CHANGE** | CAC ₹125 – ₹190<br>Show-Up 65% – 75% | High registration starts with >25% checkout drop-off | Pivot ad copy to Artist Lineup reveal; deploy 1-click WhatsApp RSVP. | Flags creative fatigue and recommends SMS copy templates. |
-| **STOP** | CAC > ₹220<br>Show-Up < 60% | Vanity impressions without discount code redemptions | Immediate campaign pause; reallocate budget within 4 hours. | Freezes spend and drafts reallocation scenario on dashboard. |
+| Scale | CAC < INR 120 and Show-up >= 75% | Clubs confirming bus contingents; referral `k > 1.2` | Unlock bonus ambassador pool and extra campus kits. | Flags scale threshold and proposes scale-up task for confirmation. |
+| Change | CAC INR 120–220 or Show-up 60%–75% | High reg starts with >25% checkout drop-off | Pivot ad copy to Artist Lineup; switch to 1-click WhatsApp RSVP. | Identifies funnel leak and drafts messaging/reminder task. |
+| Stop | CAC > INR 220 or Show-up < 60% | Vanity clicks without check-in; high no-show attrition | Pause spend immediately; reallocate remaining budget within 4h. | Triggers `THRESHOLD -> stop` alert and models reallocation. |
 
 ---
 
-## 🛠️ Section 5: Architecture & Tools Used
+## 6. Architecture, Tools & Data Sources
 
-### Technology Stack
-- **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts.
-- **Backend & Database**: Supabase (PostgreSQL schema with stored generated columns for CAC and show-up rates).
-- **Embedded AI**: Google AI Studio / Gemini 1.5 Flash API (with deterministic offline rule-engine fallback).
-- **Presentation Engine**: Programmatic PowerPoint generation using `pptxgenjs` (v4.0.1) with native chart objects.
-- **Hosting**: GitHub Pages with custom base URL configuration and `.nojekyll` routing.
+### Technology Stack & Plans Used
+- **Frontend:** React 18, TypeScript, Vite 6, Tailwind CSS, Recharts, Lucide React (open-source).
+- **Backend & Database:** Supabase (Free tier) — PostgreSQL with generated columns (`cac_inr`, `showup_rate`), least-privilege Row Level Security (`supabase/migrations/20261126000000_harden_rls_and_constraints.sql`), and Deno Edge Function (`chat-handler`).
+- **Embedded AI:** Google AI Studio / Gemini API (`gemini-2.5-flash` / `gemini-3-flash-preview`, Free tier) paired with a deterministic TypeScript analytics and fallback engine (`src/services/analytics.ts`, `src/services/gemini.ts`).
+- **Presentation Generation:** `pptxgenjs` (v4.0.1) via `generate_3_slide_deck.cjs` and Microsoft PowerPoint PDF export.
+- **Hosting:** GitHub Pages (`gh-pages` branch).
 
-### AI Tool Usage & Attribution
-- **AI Coding Assistants**: Antigravity agentic workflows used for prototyping, Tailwind layout design, and programmatic slide synthesis.
-- **Embedded Model**: Google AI Studio (`gemini-1.5-flash`) for real-time natural language query interpretation and SQL-grounded diagnostics.
+### Data Sources
+- **Festival Historical Dataset:** Synthetic, cleaned, and deduplicated RISA Festival 2025 dataset (`campaigns.csv`, `supabase/seed.sql`, `src/services/seedData.ts`).
+- **External Benchmarks:**
+  - AISHE 2023–24 (1,148 colleges in Bengaluru Urban).
+  - C&W / SAPFI 2018–19 (~5.38 Lakh college student population).
+  - Namma Metro route map (Purple & Green line Majestic interchange coverage).
+
+### Reused, Modified & Verified
+- **Reused:** Provided historical campaign and daily metrics datasets as the baseline seed.
+- **Modified:** Built custom React/TypeScript dashboard, deterministic analytics engine, Supabase RLS hardening migration, Edge Function, and `pptxgenjs` slide generator.
+- **Verified:**
+  - Automated unit and scenario test suite (`npm test` — 8/8 passing) covering stretch CAC (`INR 120`), strategy deduplication, daily reconciliation, attendee/budget edit recalculation, AI lowest-CAC ranking, underperformance diagnosis + follow-ups, budget reallocation, confirmation-gated task creation, and missing-data handling.
+  - Production TypeScript check and Vite bundle (`npm run build`).
+  - Live browser smoke test on the deployed GitHub Pages URL confirming Supabase persistence, Diagnosis search filtering, and AI Copilot responses.
 
 ---
 
-## ⚙️ Section 6: Local Setup & Configuration
+## 7. Local Setup & Configuration
 
 ### Prerequisites
-- Node.js v18+ and npm v9+
+- Node.js v18+ (tested on Node v23.10.0) and npm v9+
 
-### Quick Start
+### Installation & Commands
 ```bash
-# Clone the repository
 git clone https://github.com/RudraGupta-6071/risa-growth-dashboard.git
 cd risa-growth-dashboard
-
-# Install dependencies
 npm install
-
-# Start local development server
+npm test
+npm run build
 npm run dev
 ```
 
-### Environment Configuration (Optional)
-Create a `.env` file in the root directory to connect your live Supabase and Gemini keys:
+### Environment Variables (Optional)
+Create a `.env` file in the root directory (or configure via the in-app Settings modal):
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_GEMINI_API_KEY=your-gemini-api-key
 ```
-*(Note: If left unconfigured, the app seamlessly runs in high-performance local storage mode with full seed data and offline AI Copilot).*
+When Supabase or Gemini credentials are omitted or unreachable, the app falls back to `localStorage` (clearly indicated in the sidebar as `LOCAL STORAGE MODE` vs. `SAVED TO SUPABASE`) and the deterministic TypeScript Copilot engine.
 
 ---
 
-## 🔍 Section 7: Known Limitations & Future Work
-1. **Attribution Modeling**: Current calculations use single-touch last-click channel attribution. Future iterations could incorporate multi-touch Shapley-value attribution.
-2. **Dynamic Ticket Tiering**: The current model assumes uniform event admission. Adding multi-tier tickets (VIP, Hackathon-only, Day passes) would provide richer yield management.
-3. **Automated WhatsApp Webhooks**: In the current build, SMS and WhatsApp sequences are simulated via operational task tickets rather than live Twilio/Meta Graph API endpoints.
+## 8. Known Limitations
+1. **Synthetic Historical Data:** The 2025 campaign and daily metrics are synthetic; individual attendee demographics (age, gender, major), NPS/satisfaction scores, sponsor causal impact, and post-April 20, 2025 outcomes are not in the dataset.
+2. **Single-Touch Attribution:** Channel metrics use last-touch attribution; multi-touch overlap is modeled at the aggregate strategy level (`+1,475` gross to `+450` net).
+3. **Constant Marginal CAC Assumption:** Both the What-If Simulator and remaining-budget forecast assume constant marginal CAC when shifting or deploying funds.
+4. **Simulated Messaging Execution:** WhatsApp/SMS reminder sequences are tracked as operational tasks in the Task Board rather than connected to live Twilio or WhatsApp Business API webhooks.
+5. **Uniform Admission Model:** Assumes a single general admission tier rather than segmented VIP, competition-only, or day-pass pricing.
